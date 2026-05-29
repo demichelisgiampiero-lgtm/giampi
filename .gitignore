@@ -1,0 +1,11 @@
+node_modules/
+
+# Database SQLite (i dati locali non vanno versionati)
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+
+# Log e file di sistema
+*.log
+.DS_Store

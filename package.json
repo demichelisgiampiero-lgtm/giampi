@@ -1,0 +1,19 @@
+{
+  "name": "giornale-dei-lavori",
+  "version": "1.0.0",
+  "description": "Web app per la gestione del giornale dei lavori (diario di cantiere edile)",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
