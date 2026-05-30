@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Giornale dei Lavori</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>📒 Giornale dei Lavori</h1>
+    <div class="cantiere-picker">
+      <label for="cantiere-select">Cantiere / Commessa</label>
+      <select id="cantiere-select"></select>
+      <button id="btn-nuovo-cantiere" class="btn btn-secondary">+ Nuovo</button>
+      <button id="btn-modifica-cantiere" class="btn btn-ghost" title="Modifica cantiere">✎</button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="schede">Schede di cantiere (CME)</button>
+    <button class="tab" data-tab="giornale">Giornale</button>
+    <button class="tab" data-tab="contabilita">Contabilità / SAL</button>
+  </nav>
+
+  <main id="main">
+    <p id="no-cantiere" class="placeholder">
+      Nessun cantiere selezionato. Crea un nuovo cantiere per iniziare.
+    </p>
+
+    <!-- ===================== SCHEDE DI CANTIERE (CME) ===================== -->
+    <section id="tab-schede" class="tab-panel">
+      <div class="panel-head">
+        <h2>Schede di cantiere — voci di computo (CME)</h2>
+        <div class="actions">
+          <button id="btn-nuova-voce" class="btn">+ Nuova voce</button>
+          <button id="btn-import-csv" class="btn btn-secondary">⭱ Importa CSV</button>
+        </div>
+      </div>
+      <table class="data-table" id="tabella-voci">
+        <thead>
+          <tr>
+            <th>Codice</th><th>Descrizione</th><th>Categoria</th><th>UM</th>
+            <th class="num">Q.tà progetto</th><th class="num">Prezzo unit.</th>
+            <th class="num">Importo</th><th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- ===================== GIORNALE ===================== -->
+    <section id="tab-giornale" class="tab-panel hidden">
+      <div class="panel-head">
+        <h2>Registrazioni giornaliere</h2>
+        <div class="actions">
+          <label>Dal <input type="date" id="filtro-da" /></label>
+          <label>Al <input type="date" id="filtro-a" /></label>
+          <button id="btn-filtra" class="btn btn-secondary">Filtra</button>
+          <button id="btn-nuova-giorn" class="btn">+ Nuova giornaliera</button>
+        </div>
+      </div>
+      <table class="data-table" id="tabella-giorn">
+        <thead>
+          <tr>
+            <th>Data</th><th>Meteo</th><th>Temp.</th><th class="num">Maestranze</th>
+            <th>Lavorazioni / mezzi</th><th class="num">Voci</th><th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- ===================== CONTABILITÀ / SAL ===================== -->
+    <section id="tab-contabilita" class="tab-panel hidden">
+      <div class="panel-head">
+        <h2>Contabilità e Stato Avanzamento Lavori</h2>
+        <div class="actions">
+          <label>SAL alla data <input type="date" id="sal-data" /></label>
+          <button id="btn-calcola-sal" class="btn">Aggiorna</button>
+        </div>
+      </div>
+      <div id="sal-riepilogo" class="sal-cards"></div>
+      <table class="data-table" id="tabella-contabilita">
+        <thead>
+          <tr>
+            <th>Codice</th><th>Descrizione</th><th>UM</th>
+            <th class="num">Q.tà progetto</th><th class="num">Q.tà eseguita</th>
+            <th class="num">% avanz.</th><th class="num">Importo eseguito</th>
+            <th class="num">Residuo</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot></tfoot>
+      </table>
+    </section>
+  </main>
+
+  <!-- ===================== MODALI ===================== -->
+  <div id="modale" class="modale hidden">
+    <div class="modale-box">
+      <div class="modale-head">
+        <h3 id="modale-titolo"></h3>
+        <button id="modale-chiudi" class="btn btn-ghost">✕</button>
+      </div>
+      <div id="modale-corpo" class="modale-corpo"></div>
+      <div id="modale-azioni" class="modale-azioni"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
