@@ -1,0 +1,28 @@
+# Configurazione per pubblicare il Giornale dei Lavori su Render.com
+# (Render legge questo file con la funzione "Blueprint".)
+services:
+  - type: web
+    name: giornale-dei-lavori
+    runtime: node
+    plan: starter            # piano con disco persistente (i dati non si perdono)
+    region: frankfurt        # data center europeo
+    branch: claude/workflow-aElIb
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22.16.0"
+      # Il database vive sul disco persistente montato in /data.
+      - key: DB_PATH
+        value: /data/giornale.db
+      # Password di accesso: IMPOSTALA nel cruscotto Render (non qui!).
+      # sync:false fa sì che Render la chieda durante la creazione.
+      - key: APP_PASSWORD
+        sync: false
+      - key: APP_USER
+        value: cieffe
+    disk:
+      name: dati-giornale
+      mountPath: /data
+      sizeGB: 1

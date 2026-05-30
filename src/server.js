@@ -11,6 +11,25 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Protezione con password (HTTP Basic): attiva SOLO se è impostata la variabile
+// d'ambiente APP_PASSWORD. In locale/desktop, dove non è impostata, l'accesso
+// resta libero. Online (es. Render) la si imposta per proteggere i dati.
+// Si può personalizzare l'utente con APP_USER (default: "cieffe").
+const APP_PASSWORD = process.env.APP_PASSWORD;
+const APP_USER = process.env.APP_USER || 'cieffe';
+if (APP_PASSWORD) {
+  app.use((req, res, next) => {
+    const header = req.headers.authorization || '';
+    const [schema, encoded] = header.split(' ');
+    if (schema === 'Basic' && encoded) {
+      const [user, pass] = Buffer.from(encoded, 'base64').toString().split(':');
+      if (user === APP_USER && pass === APP_PASSWORD) return next();
+    }
+    res.set('WWW-Authenticate', 'Basic realm="Giornale dei Lavori", charset="UTF-8"');
+    res.status(401).send('Accesso riservato. Inserisci utente e password.');
+  });
+}
+
 app.use(express.json({ limit: '5mb' }));
 app.use(express.text({ type: 'text/csv', limit: '10mb' }));
 app.use(express.static(join(__dirname, '..', 'public')));

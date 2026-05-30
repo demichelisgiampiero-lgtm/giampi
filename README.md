@@ -43,6 +43,17 @@ SAL                  ── importo progressivo e % di avanzamento
 - **Node.js >= 22.5** (usa il modulo integrato `node:sqlite`, nessuna
   dipendenza nativa da compilare).
 
+## Uso online (da telefono/tablet, dati condivisi)
+
+Per usare l'app dal **telefono in cantiere** e dal **PC in ufficio** con gli
+**stessi dati**, la si pubblica online. Vedi
+**[`GUIDA-ONLINE-RENDER.md`](GUIDA-ONLINE-RENDER.md)**: il file `render.yaml`
+configura già tutto (disco persistente per i dati + accesso protetto).
+
+L'accesso online è protetto da password tramite le variabili d'ambiente
+`APP_PASSWORD` (obbligatoria per attivare la protezione) e `APP_USER`
+(default `cieffe`). In locale, dove non sono impostate, l'accesso resta libero.
+
 ## App desktop per Windows (consigliata)
 
 L'app è disponibile come **vero programma desktop** (Electron): un'icona sul
