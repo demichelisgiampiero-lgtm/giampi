@@ -59,11 +59,20 @@ jobs:
             dist/*.blockmap
           if-no-files-found: error
 
-      # Se è stato creato un tag di versione, allega l'installer alla Release.
-      - name: Pubblica nella Release (solo sui tag)
-        if: startsWith(github.ref, 'refs/tags/')
+      # Pubblica/aggiorna una Release con link di download PUBBLICO e diretto
+      # all'installer .exe (scaricabile senza login). Su push del branch usa il
+      # tag mobile "windows-latest"; sui tag di versione usa il tag stesso.
+      - name: Pubblica l'installer in una Release pubblica
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'windows-latest' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'Giornale dei Lavori — ultima versione Windows' }}
+          body: |
+            Installer Windows del **Giornale dei Lavori**, compilato automaticamente.
+
+            **Scarica** il file `Giornale dei Lavori Setup ....exe` qui sotto,
+            aprilo e segui l'installazione. Se Windows mostra "PC protetto",
+            clicca "Ulteriori informazioni" → "Esegui comunque".
           files: |
             dist/*.exe
             dist/*.blockmap
