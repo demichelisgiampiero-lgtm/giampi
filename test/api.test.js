@@ -11,6 +11,7 @@ const tmp = mkdtempSync(join(tmpdir(), 'giornale-test-'));
 process.env.DB_PATH = join(tmp, 'test.db');
 
 const { default: app } = await import('../src/server.js');
+const { chiudiDb } = await import('../src/db.js');
 let server, base;
 
 before(async () => {
@@ -20,7 +21,10 @@ before(async () => {
 
 after(() => {
   server.close();
-  rmSync(tmp, { recursive: true, force: true });
+  // Chiude il database prima di rimuovere la cartella: su Windows un file
+  // con un handle ancora aperto non è eliminabile (EPERM).
+  chiudiDb();
+  rmSync(tmp, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
 });
 
 const j = async (metodo, url, corpo) => {

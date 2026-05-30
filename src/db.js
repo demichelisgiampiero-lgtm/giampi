@@ -101,5 +101,10 @@ export function transazione(fn) {
   }
 }
 
+/** Chiude la connessione al database (utile nei test e alla chiusura dell'app). */
+export function chiudiDb() {
+  try { db.close(); } catch { /* già chiuso */ }
+}
+
 export default db;
 export { DB_PATH };
