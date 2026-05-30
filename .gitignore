@@ -6,6 +6,9 @@ data/*.db-journal
 data/*.db-wal
 data/*.db-shm
 
+# Output della build dell'app desktop (installer, pacchetti)
+dist/
+
 # Log e file di sistema
 *.log
 .DS_Store

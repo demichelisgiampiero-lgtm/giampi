@@ -5,6 +5,42 @@ Pensata per chi non è pratico di programmazione: bastano pochi click.
 
 ---
 
+# 🌟 Metodo consigliato: l'app desktop (installer)
+
+Questo metodo installa un **vero programma** con la sua icona sul Desktop.
+Non serve installare Node.js né scrivere comandi: l'installer contiene tutto.
+
+## 1. Scarica l'installer
+1. Vai nella scheda **Actions** del progetto su GitHub:
+   **https://github.com/demichelisgiampiero-lgtm/giampi/actions**
+2. Apri l'ultima esecuzione di **"Build app desktop Windows"** (con la spunta verde ✓).
+3. In fondo alla pagina, nella sezione **Artifacts**, scarica
+   **`Giornale-dei-Lavori-Windows`** (è un file .zip).
+4. Estrai lo .zip: dentro trovi **`Giornale dei Lavori Setup x.y.z.exe`**.
+
+## 2. Installa
+1. Doppio click sul file **`...Setup....exe`**.
+2. Se Windows mostra **"PC protetto da Windows"**: clicca
+   **"Ulteriori informazioni" → "Esegui comunque"** (normale per app non firmate).
+3. Segui l'installazione. Al termine trovi l'icona **Giornale dei Lavori**
+   sul Desktop e nel menu Start.
+
+## 3. Usa l'app
+- Doppio click sull'icona **Giornale dei Lavori**: si apre nella sua finestra.
+- I tuoi dati vengono salvati automaticamente in
+  `C:\Users\<tuo-utente>\AppData\Roaming\Giornale dei Lavori\giornale.db`.
+  (Dal menu **File → Apri cartella dati** la apri al volo per fare un backup.)
+
+> 💡 Per backup: copia ogni tanto il file `giornale.db` su una chiavetta o su Drive.
+
+---
+
+---
+
+# 🔧 Metodo alternativo (senza installer): launcher .bat
+
+Usa questo solo se non hai l'installer. Richiede di installare Node.js.
+
 ## 1. Installa Node.js (una volta sola)
 
 Node.js è il "motore" che fa funzionare l'app.

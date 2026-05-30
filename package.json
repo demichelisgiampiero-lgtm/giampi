@@ -1,13 +1,16 @@
 {
   "name": "giornale-dei-lavori",
   "version": "1.0.0",
-  "description": "Web app per la gestione del giornale dei lavori (diario di cantiere edile)",
+  "description": "App per la gestione del giornale dei lavori (contabilità di cantiere: CME, giornaliere, SAL)",
   "type": "module",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "electron": "electron electron/main.cjs",
+    "dist": "electron-builder --win --x64",
+    "dist:dir": "electron-builder --win --dir"
   },
   "engines": {
     "node": ">=22.5.0"
@@ -15,5 +18,42 @@
   "license": "MIT",
   "dependencies": {
     "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "it.cieffe.giornaledeilavori",
+    "productName": "Giornale dei Lavori",
+    "files": [
+      "src/**/*",
+      "public/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "electron/main.cjs"
+    },
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "electron/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Giornale dei Lavori"
+    }
   }
 }

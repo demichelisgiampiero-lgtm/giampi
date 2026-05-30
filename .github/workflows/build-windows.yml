@@ -1,0 +1,60 @@
+name: Build app desktop Windows
+
+# Compila l'installer Windows (.exe) del Giornale dei Lavori.
+# Si avvia automaticamente a ogni push sul branch e quando si crea un tag di
+# versione (es. v1.0.0). Può anche essere lanciato a mano dalla scheda "Actions".
+
+on:
+  push:
+    branches:
+      - claude/workflow-aElIb
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Scarica il codice
+        uses: actions/checkout@v4
+
+      - name: Configura Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Installa le dipendenze
+        run: npm install
+
+      - name: Esegui i test
+        run: npm test
+
+      - name: Compila l'installer Windows
+        run: npm run dist
+        env:
+          # Evita tentativi di firma/pubblicazione automatica.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      # Rende scaricabile l'installer dalla pagina della run (Artifacts).
+      - name: Carica l'installer come artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Giornale-dei-Lavori-Windows
+          path: |
+            dist/*.exe
+            dist/*.blockmap
+          if-no-files-found: error
+
+      # Se è stato creato un tag di versione, allega l'installer alla Release.
+      - name: Pubblica nella Release (solo sui tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.exe
+            dist/*.blockmap

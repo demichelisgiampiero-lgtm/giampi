@@ -355,7 +355,21 @@ app.use((err, req, res, next) => {
   res.status(status).json({ errore: err.message || 'Errore interno del server.' });
 });
 
-// Avvio solo quando eseguito direttamente (non durante i test).
+/**
+ * Avvia il server e risolve con { server, url, port }.
+ * Usato dall'app desktop (Electron). Con `port = 0` il sistema sceglie
+ * una porta libera, evitando conflitti quando l'app è già avviata altrove.
+ */
+export function avviaServer(port = PORT) {
+  return new Promise((resolve) => {
+    const server = app.listen(port, '127.0.0.1', () => {
+      const realPort = server.address().port;
+      resolve({ server, port: realPort, url: `http://127.0.0.1:${realPort}` });
+    });
+  });
+}
+
+// Avvio solo quando eseguito direttamente (non durante i test né sotto Electron).
 const eseguitoDirettamente =
   process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (eseguitoDirettamente) {

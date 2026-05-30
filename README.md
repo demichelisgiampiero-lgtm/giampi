@@ -43,11 +43,30 @@ SAL                  ── importo progressivo e % di avanzamento
 - **Node.js >= 22.5** (usa il modulo integrato `node:sqlite`, nessuna
   dipendenza nativa da compilare).
 
-## Avvio rapido su Windows (per chi non è tecnico)
+## App desktop per Windows (consigliata)
 
-Vedi la guida passo-passo **[`GUIDA-WINDOWS.md`](GUIDA-WINDOWS.md)**: in
-pratica installi Node.js, scarichi il progetto e fai **doppio click** su
-`Avvia-Giornale-Windows.bat` — l'app si apre da sola nel browser.
+L'app è disponibile come **vero programma desktop** (Electron): un'icona sul
+Desktop, finestra propria, nessun browser e nessun comando. I dati restano
+salvati sul PC e l'installer include già tutto (anche Node.js).
+
+- **Per gli utenti:** scarica l'installer `Giornale dei Lavori Setup x.y.z.exe`
+  e installalo. Vedi la guida **[`GUIDA-WINDOWS.md`](GUIDA-WINDOWS.md)**.
+  L'installer viene compilato automaticamente da GitHub Actions
+  (workflow *Build app desktop Windows*): lo trovi tra gli **Artifacts** della
+  run, oppure tra gli allegati di una **Release** se è stato creato un tag `vX.Y.Z`.
+- **Per chi sviluppa:**
+  ```bash
+  npm install
+  npm run electron     # avvia l'app desktop in locale
+  npm run dist         # genera l'installer Windows in dist/  (richiede Windows)
+  ```
+
+> L'app desktop salva il database in `%APPDATA%\Giornale dei Lavori\giornale.db`.
+
+### Alternativa senza installazione (launcher .bat)
+
+In assenza dell'installer puoi usare `Avvia-Giornale-Windows.bat`: richiede
+Node.js installato, parte col doppio click e apre l'app nel browser.
 
 ## Avvio
 
