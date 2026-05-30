@@ -43,6 +43,12 @@ SAL                  ── importo progressivo e % di avanzamento
 - **Node.js >= 22.5** (usa il modulo integrato `node:sqlite`, nessuna
   dipendenza nativa da compilare).
 
+## Avvio rapido su Windows (per chi non è tecnico)
+
+Vedi la guida passo-passo **[`GUIDA-WINDOWS.md`](GUIDA-WINDOWS.md)**: in
+pratica installi Node.js, scarichi il progetto e fai **doppio click** su
+`Avvia-Giornale-Windows.bat` — l'app si apre da sola nel browser.
+
 ## Avvio
 
 ```bash
