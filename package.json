@@ -9,7 +9,7 @@
     "dev": "node --watch src/server.js",
     "test": "node --test",
     "electron": "electron electron/main.cjs",
-    "dist": "electron-builder --win --x64",
+    "dist": "electron-builder --win --x64 --publish never",
     "dist:dir": "electron-builder --win --dir"
   },
   "engines": {
@@ -46,7 +46,8 @@
           "arch": ["x64"]
         }
       ],
-      "icon": "electron/icon.png"
+      "icon": "electron/icon.ico",
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,

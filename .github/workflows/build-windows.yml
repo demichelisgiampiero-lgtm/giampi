@@ -39,6 +39,15 @@ jobs:
         env:
           # Evita tentativi di firma/pubblicazione automatica.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          # Output dettagliato di electron-builder (utile in caso di errore).
+          DEBUG: 'electron-builder'
+
+      - name: Mostra il contenuto di dist (diagnostica)
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path dist) { Get-ChildItem -Recurse dist | Select-Object FullName, Length }
+          else { Write-Host "Cartella dist assente" }
 
       # Rende scaricabile l'installer dalla pagina della run (Artifacts).
       - name: Carica l'installer come artifact

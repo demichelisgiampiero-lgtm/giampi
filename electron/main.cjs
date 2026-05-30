@@ -32,7 +32,7 @@ function creaFinestra(url) {
     minHeight: 600,
     title: 'Giornale dei Lavori',
     backgroundColor: '#f4f6f9',
-    icon: path.join(__dirname, 'icon.png'),
+    icon: path.join(__dirname, 'icon.ico'),
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
 
