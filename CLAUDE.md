@@ -48,6 +48,10 @@ Quando lavoro in questo repository devo:
 - **Committare la memoria** al termine del lavoro con un messaggio chiaro, così
   nulla va perso (la repo è l'unica cosa che sopravvive al container effimero).
 - Essere **conciso e fattuale**: il diario è una memoria, non un romanzo.
+- **Mantenere il vault navigabile in Obsidian**: ogni nota nuova va collegata da
+  `[[index]]` con un `[[wikilink]]` e taggata (es. `#progetto`, `#diario`,
+  `#idea`). Così il grafo resta utile man mano che cresce. Vedi
+  `memory/guida-obsidian.md`.
 
 ## Comando rapido
 
