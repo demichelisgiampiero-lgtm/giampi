@@ -1,7 +1,11 @@
+---
+tags: [decisione]
+---
+
 # Log delle decisioni
 
 > Decisioni importanti, in ordine cronologico (le più recenti in alto).
-> Formato: **data** — decisione — *motivazione*.
+> Formato: **data** — decisione — *motivazione*. Torna all'[[index]].
 
 ---
 

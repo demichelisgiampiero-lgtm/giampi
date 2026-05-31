@@ -1,7 +1,12 @@
+---
+tags: [profilo, persona]
+---
+
 # Profilo — Giampiero
 
 > File a evoluzione lenta. Contiene ciò che resta vero nel tempo su Giampiero.
 > Claude lo aggiorna quando emergono nuove informazioni stabili.
+> Torna all'[[index]].
 
 ## Chi sono
 
@@ -16,8 +21,9 @@
 
 ## Progetti in corso
 
-- **Second brain per Claude** — questa repo (`giampi`). Obiettivo: dare a Claude
-  una memoria persistente tra le sessioni, alla Karpathy. _Creato il 2026-05-31._
+- **Second brain per Claude** `#progetto` — questa repo (`giampi`). Obiettivo:
+  dare a Claude una memoria persistente tra le sessioni, alla
+  [[karpathy-second-brain|Karpathy]]. _Creato il [[2026-05-31]]._
 
 ## Obiettivi
 
