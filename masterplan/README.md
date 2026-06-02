@@ -4,6 +4,9 @@ Prototipo per gestire il flusso di lavoro della rete **Masterplan**: dall'arrivo
 di una richiesta (mail / telefonata) fino all'assegnazione del lavoro a una o più
 società della rete, con tracciamento del carico per non sovraccaricare nessuno.
 
+Include **login per ruoli**, **notifiche email automatiche**, **promemoria alle
+scadenze di 24h** e una pagina di **report e statistiche**.
+
 L'applicazione **non richiede alcuna installazione**: usa solo Python 3
 (libreria standard) e salva i dati in un file SQLite locale.
 
@@ -16,8 +19,20 @@ python3 app.py
 
 Poi apri il browser su **http://localhost:8000**
 
-Alla prima esecuzione vengono create automaticamente le **9 società** di esempio
-e il database `masterplan.db`. Per ripartire da zero basta cancellare quel file.
+Alla prima esecuzione vengono create automaticamente le **9 società** di esempio,
+gli utenti e il database `masterplan.db`. Per ripartire da zero cancella quel file.
+
+## Accessi (utenti di prova)
+
+Per il prototipo ogni password coincide con il nome utente:
+
+| Nome utente   | Ruolo            | Cosa può fare |
+|---------------|------------------|---------------|
+| `segreteria`  | Segreteria       | Registra richieste, invia alle società, vede report e posta |
+| `manager`     | Manager di rete  | Tutto della segreteria + definisce gruppo di lavoro e PM |
+| `alfa`, `beta`, … | Società      | Risponde (accetta/rifiuta) alle proprie assegnazioni |
+
+(ogni società ha un utente con username = prima parola del nome, es. `gamma`, `delta`…)
 
 ## Il flusso gestito (i ruoli)
 
@@ -56,19 +71,56 @@ Il **Cruscotto** e la pagina **Società della rete** mostrano per ogni società:
 Quando arriva nuovo lavoro, il manager vede subito chi è scarico e chi è pieno,
 evitando di sovraccaricare le società.
 
+## Notifiche email
+
+Ogni passaggio del flusso genera una **notifica automatica** (nuova richiesta al
+manager, invio alle società, esito accettato/rifiutato, avvio gruppo, scadenza).
+
+- Tutte le notifiche sono sempre registrate nella pagina **Posta inviata**, così
+  il flusso è verificabile anche senza un server di posta.
+- Per **inviarle davvero** via email basta configurare un server SMTP con queste
+  variabili d'ambiente prima di avviare l'app:
+
+  ```bash
+  export MP_SMTP_HOST=smtp.tuoprovider.it
+  export MP_SMTP_PORT=587
+  export MP_SMTP_USER=utente
+  export MP_SMTP_PASS=password
+  export MP_SMTP_FROM="Masterplan <noreply@tuodominio.it>"
+  python3 app.py
+  ```
+
+  Senza `MP_SMTP_HOST` l'app resta in modalità *simulazione* (solo registrazione).
+
+## Promemoria automatici (24h)
+
+Un processo in background controlla periodicamente le scadenze:
+
+- invia un **sollecito** alla società quando mancano poche ore alla scadenza;
+- segna come **Scaduta** l'assegnazione non risposta entro 24h e **avvisa il
+  manager**, riaprendo di fatto lo smistamento.
+
+## Report e statistiche
+
+La pagina **Report** mostra: richieste per stato e per tipo, principali clienti,
+e per ogni società il numero di inviti, accettazioni, rifiuti, scadenze, il
+**tasso di accettazione** e il **tempo medio di risposta**.
+
 ## File del progetto
 
-| File        | Contenuto |
-|-------------|-----------|
-| `app.py`    | Web server e instradamento (solo libreria standard) |
-| `db.py`     | Dati: società, richieste, assegnazioni, eventi, calcolo carico |
-| `views.py`  | Pagine HTML (interfaccia in italiano) |
-| `masterplan.db` | Database SQLite (creato all'avvio, non versionato) |
+| File              | Contenuto |
+|-------------------|-----------|
+| `app.py`          | Web server, instradamento, login, processo promemoria |
+| `db.py`           | Dati: società, utenti, richieste, assegnazioni, report |
+| `views.py`        | Pagine HTML (interfaccia in italiano) |
+| `auth.py`         | Login, sessioni e controllo dei ruoli |
+| `security.py`     | Cifratura delle password (PBKDF2) |
+| `notifications.py`| Notifiche email (SMTP reale o simulazione) |
+| `masterplan.db`   | Database SQLite (creato all'avvio, non versionato) |
 
 ## Possibili sviluppi futuri
 
-- Invio reale delle email (notifica automatica alle società e alla segreteria).
-- Login per ruoli (segreteria / manager / referenti società).
-- Promemoria automatici allo scadere delle 24h.
-- Report e statistiche per periodo, cliente, tipo di lavoro.
 - Allegati (bando di gara, documenti) sulle richieste.
+- Filtri e ricerca nelle richieste; export dei report in Excel/PDF.
+- Notifiche anche via PEC; firma delle accettazioni.
+- Storico del carico nel tempo e previsione di disponibilità.

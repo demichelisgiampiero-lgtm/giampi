@@ -2,10 +2,12 @@
 Rendering HTML per Masterplan (nessun motore di template esterno).
 
 Ogni funzione restituisce una stringa HTML. Il layout di base contiene il CSS
-in linea, così non serve servire file statici.
+in linea e una barra di navigazione che cambia in base al ruolo dell'utente.
 """
 
 import html
+
+import auth
 
 # Etichette leggibili e colori per gli stati delle richieste.
 STATI_RICHIESTA = {
@@ -23,6 +25,7 @@ STATI_ASSEGNAZIONE = {
     "SCADUTA":   ("Scaduta",   "#fd7e14"),
 }
 TIPI = {"GARA": "Gara", "LAVORO": "Lavoro specifico", "CONSULENZA": "Consulenza"}
+RUOLI = {"SEGRETERIA": "Segreteria", "MANAGER": "Manager di rete", "SOCIETA": "Società"}
 
 
 def e(s):
@@ -60,15 +63,25 @@ def barra_saturazione(perc):
     )
 
 
+def mini_barra(valore, massimo, colore="#0d6efd"):
+    """Barra orizzontale semplice per i report (senza librerie grafiche)."""
+    perc = round(100 * valore / massimo) if massimo else 0
+    return ('<div class="bar" style="width:160px"><div class="bar-fill" '
+            'style="width:%d%%;background:%s"></div></div>' % (perc, colore))
+
+
 CSS = """
 * { box-sizing: border-box; }
 body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
        margin: 0; background: #f4f6f9; color: #1f2733; }
-header { background: #0b2545; color: #fff; padding: 14px 26px;
-         display: flex; align-items: center; gap: 26px; }
+header { background: #0b2545; color: #fff; padding: 12px 26px;
+         display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
 header h1 { font-size: 20px; margin: 0; letter-spacing: .5px; }
-header nav a { color: #cfe0ff; text-decoration: none; margin-right: 18px; font-size: 15px; }
+header nav { flex: 1; }
+header nav a { color: #cfe0ff; text-decoration: none; margin-right: 16px; font-size: 15px; }
 header nav a:hover { color: #fff; }
+header .user { font-size: 13px; color: #cfe0ff; }
+header .user a { color: #ffd; }
 .container { max-width: 1100px; margin: 26px auto; padding: 0 20px; }
 .card { background: #fff; border-radius: 10px; padding: 20px 22px; margin-bottom: 20px;
         box-shadow: 0 1px 3px rgba(0,0,0,.08); }
@@ -112,35 +125,81 @@ label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 5px; c
 .checkrow input[type=checkbox] { width:auto; }
 .checkrow .peso { width:90px; }
 .pill { background:#eef1f5; padding:2px 9px; border-radius:10px; font-size:12px; }
+.login-box { max-width: 380px; margin: 8vh auto; }
+.cred { font-size:13px; background:#f6f8fb; border:1px solid #e6ebf2; border-radius:8px; padding:10px 14px; }
+.cred code { background:#eef1f5; padding:1px 5px; border-radius:4px; }
+.err { background:#f8d7da; border:1px solid #f1aeb5; color:#842029; padding:10px 14px; border-radius:8px; }
+.mono { font-family: ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; font-size:13px; }
 """
 
 
-def layout(titolo, contenuto, flash=None):
+def _nav(utente):
+    if not utente:
+        return ""
+    links = ['<a href="/">Cruscotto</a>', '<a href="/richieste">Richieste</a>']
+    if auth.is_staff(utente):
+        links.append('<a href="/richieste/nuova">+ Nuova richiesta</a>')
+    links.append('<a href="/societa">Società della rete</a>')
+    if auth.is_staff(utente):
+        links.append('<a href="/report">Report</a>')
+        links.append('<a href="/outbox">Posta inviata</a>')
+    user = ('<span class="user">👤 %s · %s &nbsp;|&nbsp; '
+            '<a href="/logout">Esci</a></span>'
+            % (e(utente["nome"]), e(RUOLI.get(utente["ruolo"], utente["ruolo"]))))
+    return '<nav>%s</nav>%s' % ("".join(links), user)
+
+
+def layout(titolo, contenuto, flash=None, utente=None):
     flash_html = ('<div class="flash">%s</div>' % e(flash)) if flash else ""
     return """<!doctype html>
 <html lang="it"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{titolo} · Masterplan</title><style>{css}</style></head>
 <body>
-<header>
-  <h1>🛰️ MASTERPLAN</h1>
-  <nav>
-    <a href="/">Cruscotto</a>
-    <a href="/richieste">Richieste</a>
-    <a href="/richieste/nuova">+ Nuova richiesta</a>
-    <a href="/societa">Società della rete</a>
-  </nav>
-</header>
+<header><h1>🛰️ MASTERPLAN</h1>{nav}</header>
 <div class="container">{flash}{contenuto}</div>
 </body></html>""".format(
-        titolo=e(titolo), css=CSS, flash=flash_html, contenuto=contenuto
+        titolo=e(titolo), css=CSS, nav=_nav(utente),
+        flash=flash_html, contenuto=contenuto
     )
 
 
 # --------------------------------------------------------------------------- #
-# Pagine
+# Login
 # --------------------------------------------------------------------------- #
-def pagina_dashboard(stats, carichi, ultime):
+def pagina_login(credenziali, errore=None):
+    err = ('<div class="err">%s</div>' % e(errore)) if errore else ""
+    righe_cred = "".join(
+        "<tr><td><code>%s</code></td><td>%s</td><td>%s</td></tr>"
+        % (e(c["username"]), e(RUOLI.get(c["ruolo"], c["ruolo"])), e(c["nome"]))
+        for c in credenziali
+    )
+    contenuto = """
+    <div class="card login-box">
+      <h2 style="text-align:center">🛰️ Masterplan</h2>
+      <p class="muted" style="text-align:center">Accedi per continuare</p>
+      %s
+      <form method="post" action="/login">
+        <label>Nome utente</label>
+        <input name="username" autofocus required>
+        <label>Password</label>
+        <input name="password" type="password" required>
+        <p style="margin-top:16px"><button class="btn" style="width:100%%" type="submit">Accedi</button></p>
+      </form>
+      <details style="margin-top:14px">
+        <summary class="muted">Accessi di prova (password = nome utente)</summary>
+        <div class="cred" style="margin-top:8px">
+          <table>%s</table>
+        </div>
+      </details>
+    </div>""" % (err, righe_cred)
+    return layout("Accesso", contenuto, utente=None)
+
+
+# --------------------------------------------------------------------------- #
+# Dashboard
+# --------------------------------------------------------------------------- #
+def pagina_dashboard(stats, carichi, ultime, utente):
     ps = stats["per_stato"]
     aperte = ps.get("RICEVUTA", 0) + ps.get("INVIATA", 0) + \
         ps.get("ACCETTATA", 0) + ps.get("IN_CORSO", 0)
@@ -153,12 +212,10 @@ def pagina_dashboard(stats, carichi, ultime):
     </div>
     """ % (aperte, stats["in_attesa"], ps.get("IN_CORSO", 0), ps.get("COMPLETATA", 0))
 
-    # Tabella carico società
     righe_carico = ""
     for c in carichi:
         righe_carico += (
-            "<tr><td><a href='/societa'>%s</a></td><td>%.0f / %.0f</td>"
-            "<td>%s</td><td>%d</td></tr>"
+            "<tr><td>%s</td><td>%.0f / %.0f</td><td>%s</td><td>%d</td></tr>"
             % (e(c["nome"]), c["carico"], c["capacita"],
                barra_saturazione(c["saturazione"]), c["lavori_attivi"])
         )
@@ -167,7 +224,6 @@ def pagina_dashboard(stats, carichi, ultime):
     <table><tr><th>Società</th><th>Carico</th><th>Saturazione</th><th>Lavori attivi</th></tr>
     %s</table></div>""" % righe_carico
 
-    # Ultime richieste
     righe_ult = ""
     for r in ultime:
         righe_ult += (
@@ -178,17 +234,22 @@ def pagina_dashboard(stats, carichi, ultime):
                e(r["data_arrivo"]))
         )
     if not righe_ult:
-        righe_ult = "<tr><td colspan='5' class='muted'>Nessuna richiesta. Inizia da “Nuova richiesta”.</td></tr>"
+        righe_ult = "<tr><td colspan='5' class='muted'>Nessuna richiesta.</td></tr>"
     tab_ult = """
     <div class="card"><h2>Ultime richieste</h2>
     <table><tr><th>Codice</th><th>Oggetto</th><th>Tipo</th><th>Stato</th><th>Arrivo</th></tr>
     %s</table></div>""" % righe_ult
 
     contenuto = '<div class="card">%s</div>%s%s' % (cards, tab_carico, tab_ult)
-    return layout("Cruscotto", contenuto)
+    return layout("Cruscotto", contenuto, utente=utente)
 
 
-def pagina_lista_richieste(richieste):
+# --------------------------------------------------------------------------- #
+# Richieste
+# --------------------------------------------------------------------------- #
+def pagina_lista_richieste(richieste, utente):
+    bottone = ('<a class="btn btn-sm" style="float:right" href="/richieste/nuova">+ Nuova</a>'
+               if auth.is_staff(utente) else "")
     righe = ""
     for r in richieste:
         righe += (
@@ -203,17 +264,17 @@ def pagina_lista_richieste(richieste):
         righe = "<tr><td colspan='7' class='muted'>Nessuna richiesta.</td></tr>"
     contenuto = """
     <div class="card">
-      <h2>Richieste <a class="btn btn-sm" style="float:right" href="/richieste/nuova">+ Nuova</a></h2>
+      <h2>Richieste %s</h2>
       <table>
         <tr><th>Codice</th><th>Oggetto</th><th>Tipo</th><th>Cliente</th>
             <th>Stato</th><th>Project Manager</th><th>Arrivo</th></tr>
         %s
       </table>
-    </div>""" % righe
-    return layout("Richieste", contenuto)
+    </div>""" % (bottone, righe)
+    return layout("Richieste", contenuto, utente=utente)
 
 
-def pagina_nuova_richiesta():
+def pagina_nuova_richiesta(utente):
     opzioni_tipo = "".join(
         '<option value="%s">%s</option>' % (k, v) for k, v in TIPI.items()
     )
@@ -230,19 +291,16 @@ def pagina_nuova_richiesta():
         </div>
         <label>Descrizione / dettagli</label>
         <textarea name="descrizione" rows="4" placeholder="Riferimenti email, importo, requisiti..."></textarea>
-        <label>Registrata da</label>
-        <input name="chi" value="Segreteria di rete">
         <p style="margin-top:18px">
           <button class="btn" type="submit">Registra richiesta</button>
           <a class="btn btn-secondary" href="/richieste">Annulla</a>
         </p>
       </form>
     </div>""" % opzioni_tipo
-    return layout("Nuova richiesta", contenuto)
+    return layout("Nuova richiesta", contenuto, utente=utente)
 
 
 def _box_assegna(r, societa_carichi, assegnate_ids):
-    """Form con cui il manager di rete individua le società."""
     righe = ""
     for c in societa_carichi:
         if c["id"] in assegnate_ids or not c["attiva"]:
@@ -262,18 +320,15 @@ def _box_assegna(r, societa_carichi, assegnate_ids):
     <div class="card">
       <h3>Assegna a società (decisione manager di rete)</h3>
       <p class="muted">Seleziona le società da coinvolgere e il peso stimato del lavoro.
-         La segreteria invia la richiesta: avranno 24h per rispondere.</p>
+         All'invio partono le email e il conto alla rovescia di 24h.</p>
       <form method="post" action="/richieste/%d/assegna">
         %s
-        <label>Inviata da</label>
-        <input name="chi" value="Segreteria di rete">
         <p style="margin-top:14px"><button class="btn" type="submit">Invia alle società selezionate</button></p>
       </form>
     </div>""" % (r["id"], righe)
 
 
 def _box_gruppo(r, assegnazioni):
-    """Form per definire il project manager (solo se c'è almeno un'accettazione)."""
     accettate = [a for a in assegnazioni if a["stato"] == "ACCETTATA"]
     if not accettate:
         return ""
@@ -289,21 +344,18 @@ def _box_gruppo(r, assegnazioni):
           <div><label>Nome Project Manager</label><input name="pm_nome" placeholder="Es. Ing. Rossi"></div>
           <div><label>Società del PM (capofila)</label><select name="pm_societa_id">%s</select></div>
         </div>
-        <label>Definito da</label>
-        <input name="chi" value="Manager di rete">
         <p style="margin-top:14px"><button class="btn btn-success" type="submit">Avvia il lavoro</button></p>
       </form>
     </div>""" % (r["id"], opzioni)
 
 
-def pagina_dettaglio_richiesta(r, assegnazioni, eventi, societa_carichi):
+def pagina_dettaglio_richiesta(r, assegnazioni, eventi, societa_carichi, utente):
     assegnate_ids = {a["societa_id"] for a in assegnazioni}
 
-    # Riepilogo assegnazioni con azioni di risposta
     righe_ass = ""
     for a in assegnazioni:
         azioni = ""
-        if a["stato"] == "INVIATA":
+        if a["stato"] == "INVIATA" and auth.puo_rispondere(utente, a["societa_id"]):
             azioni = """
             <form method="post" action="/assegnazioni/%d/rispondi" style="display:flex;gap:6px;align-items:center">
               <input type="hidden" name="ric" value="%d">
@@ -311,6 +363,8 @@ def pagina_dettaglio_richiesta(r, assegnazioni, eventi, societa_carichi):
               <button class="btn btn-success btn-sm" name="esito" value="accetta">Accetta</button>
               <button class="btn btn-danger btn-sm" name="esito" value="rifiuta">Rifiuta</button>
             </form>""" % (a["id"], r["id"])
+        elif a["stato"] == "INVIATA":
+            azioni = "<span class='muted'>in attesa</span>"
         elif a["stato"] == "RIFIUTATA" and a["motivo_rifiuto"]:
             azioni = "<span class='muted'>%s</span>" % e(a["motivo_rifiuto"])
         ruolo = badge("Capofila", "#0b2545") if a["ruolo"] == "CAPOFILA" else \
@@ -329,23 +383,21 @@ def pagina_dettaglio_richiesta(r, assegnazioni, eventi, societa_carichi):
         <table><tr><th>Società</th><th>Stato</th><th>Peso</th><th>Scadenza 24h</th>
         <th>Risposta</th><th>Azione</th></tr>%s</table></div>""" % righe_ass
 
-    # Box assegnazione (se ancora in fase di smistamento)
     box_assegna = ""
-    if r["stato"] in ("RICEVUTA", "INVIATA"):
+    if auth.is_staff(utente) and r["stato"] in ("RICEVUTA", "INVIATA"):
         box_assegna = _box_assegna(r, societa_carichi, assegnate_ids)
 
-    box_gruppo = _box_gruppo(r, assegnazioni) if r["stato"] == "ACCETTATA" else ""
+    box_gruppo = ""
+    if auth.is_manager(utente) and r["stato"] == "ACCETTATA":
+        box_gruppo = _box_gruppo(r, assegnazioni)
 
-    # Azione completamento
     box_completa = ""
-    if r["stato"] == "IN_CORSO":
+    if auth.is_staff(utente) and r["stato"] == "IN_CORSO":
         box_completa = """
         <div class="card"><form method="post" action="/richieste/%d/completa">
-          <input name="chi" type="hidden" value="Project Manager">
           <button class="btn btn-secondary">✓ Segna come completata</button>
         </form></div>""" % r["id"]
 
-    # Timeline eventi
     eventi_html = "".join(
         "<li><strong>%s</strong> — %s <span class='muted'>(%s)</span></li>"
         % (e(ev["quando"]), e(ev["testo"]), e(ev["chi"])) for ev in eventi
@@ -381,19 +433,36 @@ def pagina_dettaglio_richiesta(r, assegnazioni, eventi, societa_carichi):
 
     contenuto = (intestazione + box_assegna + box_assegnazioni +
                  box_gruppo + box_completa + box_eventi)
-    return layout("Richiesta %s" % (r["codice"] or r["id"]), contenuto)
+    return layout("Richiesta %s" % (r["codice"] or r["id"]), contenuto, utente=utente)
 
 
-def pagina_societa(carichi):
+# --------------------------------------------------------------------------- #
+# Società
+# --------------------------------------------------------------------------- #
+def pagina_societa(carichi, utente):
     righe = ""
     for c in carichi:
-        stato = "attiva" if c["attiva"] else "non attiva"
         righe += (
             "<tr><td><strong>%s</strong></td><td>%s</td><td>%s</td>"
             "<td>%.0f</td><td>%s</td><td>%d</td></tr>"
             % (e(c["nome"]), e(c["referente"] or "—"), e(c["email"] or "—"),
                c["capacita"], barra_saturazione(c["saturazione"]), c["lavori_attivi"])
         )
+    form = ""
+    if auth.is_staff(utente):
+        form = """
+        <div class="card">
+          <h3>Aggiungi società</h3>
+          <form method="post" action="/societa/nuova">
+            <div class="row">
+              <div><label>Nome *</label><input name="nome" required></div>
+              <div><label>Referente</label><input name="referente"></div>
+              <div><label>Email</label><input name="email" type="email"></div>
+              <div><label>Capacità (punti)</label><input name="capacita" type="number" step="1" value="10"></div>
+            </div>
+            <p style="margin-top:14px"><button class="btn" type="submit">Aggiungi</button></p>
+          </form>
+        </div>"""
     contenuto = """
     <div class="card">
       <h2>Società della rete</h2>
@@ -402,17 +471,105 @@ def pagina_societa(carichi):
             <th>Capacità</th><th>Saturazione</th><th>Lavori attivi</th></tr>
         %s
       </table>
+    </div>%s""" % (righe, form)
+    return layout("Società", contenuto, utente=utente)
+
+
+# --------------------------------------------------------------------------- #
+# Report e statistiche
+# --------------------------------------------------------------------------- #
+def pagina_report(rep, utente):
+    tmg = rep["tempo_medio_globale"]
+    cards = """
+    <div class="stat-grid">
+      <div class="stat"><div class="num">%d</div><div class="lbl">Richieste totali</div></div>
+      <div class="stat"><div class="num" style="color:#20c997">%d</div><div class="lbl">Completate</div></div>
+      <div class="stat"><div class="num" style="color:#0d6efd">%s</div><div class="lbl">Tempo medio risposta (ore)</div></div>
+    </div>""" % (rep["totale_richieste"], rep["completate"],
+                 ("%s" % tmg) if tmg is not None else "—")
+
+    max_stato = max([row["n"] for row in rep["per_stato"]] or [1])
+    righe_stato = "".join(
+        "<tr><td>%s</td><td>%d</td><td>%s</td></tr>"
+        % (badge_stato_richiesta(row["stato"]), row["n"], mini_barra(row["n"], max_stato))
+        for row in rep["per_stato"]
+    ) or "<tr><td colspan='3' class='muted'>Nessun dato.</td></tr>"
+
+    max_tipo = max([row["n"] for row in rep["per_tipo"]] or [1])
+    righe_tipo = "".join(
+        "<tr><td>%s</td><td>%d</td><td>%s</td></tr>"
+        % (e(TIPI.get(row["tipo"], row["tipo"])), row["n"],
+           mini_barra(row["n"], max_tipo, "#6610f2"))
+        for row in rep["per_tipo"]
+    ) or "<tr><td colspan='3' class='muted'>Nessun dato.</td></tr>"
+
+    righe_cliente = "".join(
+        "<tr><td>%s</td><td>%d</td></tr>" % (e(row["cliente"]), row["n"])
+        for row in rep["per_cliente"]
+    ) or "<tr><td colspan='2' class='muted'>Nessun dato.</td></tr>"
+
+    righe_soc = ""
+    for s in rep["societa_stats"]:
+        tasso = ("%d%%" % s["tasso"]) if s["tasso"] is not None else "—"
+        tmedio = ("%s h" % s["tempo_medio"]) if s["tempo_medio"] is not None else "—"
+        righe_soc += (
+            "<tr><td><strong>%s</strong></td><td>%d</td><td>%d</td><td>%d</td>"
+            "<td>%d</td><td>%s</td><td>%s</td></tr>"
+            % (e(s["nome"]), s["inviate"], s["accettate"], s["rifiutate"],
+               s["scadute"], tasso, tmedio)
+        )
+
+    contenuto = """
+    <div class="card">%s</div>
+    <div class="row">
+      <div class="card" style="flex:1;min-width:320px"><h3>Richieste per stato</h3>
+        <table><tr><th>Stato</th><th>N.</th><th></th></tr>%s</table></div>
+      <div class="card" style="flex:1;min-width:320px"><h3>Richieste per tipo</h3>
+        <table><tr><th>Tipo</th><th>N.</th><th></th></tr>%s</table></div>
     </div>
+    <div class="card"><h3>Performance delle società</h3>
+      <p class="muted">Tasso di accettazione = accettate / (accettate + rifiutate).</p>
+      <table>
+        <tr><th>Società</th><th>Inviate</th><th>Accettate</th><th>Rifiutate</th>
+            <th>Scadute</th><th>Tasso accett.</th><th>Tempo medio</th></tr>
+        %s
+      </table>
+    </div>
+    <div class="card"><h3>Principali clienti / enti</h3>
+      <table><tr><th>Cliente</th><th>Richieste</th></tr>%s</table></div>
+    """ % (cards, righe_stato, righe_tipo, righe_soc, righe_cliente)
+    return layout("Report", contenuto, utente=utente)
+
+
+# --------------------------------------------------------------------------- #
+# Posta inviata (outbox)
+# --------------------------------------------------------------------------- #
+def pagina_outbox(messaggi, smtp_attivo, utente):
+    stato_smtp = (badge("SMTP attivo — invio reale", "#198754") if smtp_attivo
+                  else badge("Simulazione — solo registrate qui", "#fd7e14"))
+    righe = ""
+    for m in messaggi:
+        spedita = (badge("inviata", "#198754") if m["inviata_smtp"]
+                   else "<span class='pill'>registrata</span>")
+        link = ("<a href='/richieste/%d'>apri</a>" % m["richiesta_id"]
+                if m["richiesta_id"] else "—")
+        righe += """
+        <tr><td class="muted">%s</td><td>%s<br><span class="muted">%s</span></td>
+        <td><strong>%s</strong><br><span class="mono">%s</span></td>
+        <td>%s</td><td>%s</td></tr>""" % (
+            e(m["quando"]), e(m["destinatario"]), e(m["destinatario_email"] or "—"),
+            e(m["oggetto"]), e(m["corpo"]), spedita, link)
+    if not righe:
+        righe = "<tr><td colspan='5' class='muted'>Nessun messaggio inviato.</td></tr>"
+    contenuto = """
     <div class="card">
-      <h3>Aggiungi società</h3>
-      <form method="post" action="/societa/nuova">
-        <div class="row">
-          <div><label>Nome *</label><input name="nome" required></div>
-          <div><label>Referente</label><input name="referente"></div>
-          <div><label>Email</label><input name="email" type="email"></div>
-          <div><label>Capacità (punti)</label><input name="capacita" type="number" step="1" value="10"></div>
-        </div>
-        <p style="margin-top:14px"><button class="btn" type="submit">Aggiungi</button></p>
-      </form>
-    </div>""" % righe
-    return layout("Società", contenuto)
+      <h2>Posta inviata &nbsp; %s</h2>
+      <p class="muted">Tutte le notifiche automatiche generate dal flusso (invii alle
+        società, risposte, solleciti 24h, avvii lavoro, scadenze). Configura un
+        server SMTP con le variabili d'ambiente MP_SMTP_* per spedirle davvero.</p>
+      <table>
+        <tr><th>Quando</th><th>Destinatario</th><th>Messaggio</th><th>Stato</th><th>Richiesta</th></tr>
+        %s
+      </table>
+    </div>""" % (stato_smtp, righe)
+    return layout("Posta inviata", contenuto, utente=utente)
