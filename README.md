@@ -10,6 +10,21 @@ cliente**, redige una bozza di pratica **AUA — Autorizzazione Unica Ambientale
 È un documento autosufficiente: aprilo in Claude Code desktop e segui la
 **Sezione 9 (Piano di build)**, fase per fase, fino ad avere il software funzionante.
 
+## 📦 File unico (da caricare direttamente in Claude Code)
+
+Se ti serve **un solo file** autosufficiente — senza cartelle né package — usa
+[`aua_campania.py`](./aua_campania.py): contiene tutto (checklist, motore, template,
+generazione Word) e sa anche generare da sé la checklist vuota e un esempio.
+
+```bash
+pip install python-docx Jinja2 PyYAML
+
+python aua_campania.py crea-checklist mia.yaml      # crea la checklist da compilare
+python aua_campania.py esempio esempio.yaml         # oppure un esempio già pronto
+python aua_campania.py applicabilita esempio.yaml   # quali titoli servono
+python aua_campania.py genera esempio.yaml -o out   # genera il pacchetto Word
+```
+
 ## Stato attuale
 
 - ✅ **Fase 0 (setup)**: `requirements.txt`, `aua/__init__.py`, `aua/intake.py`
