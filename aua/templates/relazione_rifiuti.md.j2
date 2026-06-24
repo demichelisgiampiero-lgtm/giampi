@@ -1,0 +1,72 @@
+# Relazione tecnica — Recupero di rifiuti in procedura semplificata
+
+**Titolo G dell'AUA — DPR 59/2013 — artt. 215-216 D.Lgs. 152/2006**
+
+{% set rf = rifiuti_recupero | default({}) %}
+
+## 1. Dati dell'impianto
+
+- **Denominazione:** {{ impianto.denominazione | default("[DA COMPLETARE: denominazione impianto]") }}
+- **Comune:** {{ impianto.comune | default("[DA COMPLETARE: comune]") }} ({{ impianto.provincia | default("[DA COMPLETARE: provincia]") }})
+
+## 2. Inquadramento normativo
+
+{% if rf.pericolosita == "non_pericolosi" %}
+L'attività riguarda il recupero di **rifiuti non pericolosi** in procedura
+semplificata, secondo le tipologie e le condizioni del **DM 5 febbraio 1998**.
+{% elif rf.pericolosita == "pericolosi" %}
+L'attività riguarda il recupero di **rifiuti pericolosi** in procedura semplificata,
+secondo le tipologie e le condizioni del **DM 12 giugno 2002, n. 161**.
+{% else %}
+[DA COMPLETARE: pericolosità dei rifiuti — "non_pericolosi" (DM 5/2/1998) oppure
+"pericolosi" (DM 161/2002)]
+{% endif %}
+
+## 3. Codici EER dei rifiuti gestiti
+
+{% set codici = rf.codici_eer | default([]) %}
+{% if codici %}
+| Codice EER |
+|------------|
+{% for c in codici %}
+| {{ c }} |
+{% endfor %}
+{% else %}
+[DA COMPLETARE: elenco dei codici EER dei rifiuti gestiti]
+{% endif %}
+
+## 4. Operazioni di recupero
+
+{% set operazioni = rf.operazioni | default([]) %}
+{% if operazioni %}
+Sono effettuate le seguenti operazioni di recupero (Allegato C alla Parte Quarta
+del D.Lgs. 152/2006):
+
+{% for op in operazioni %}
+- {{ op }}
+{% endfor %}
+{% else %}
+[DA COMPLETARE: operazioni di recupero (codici R, es. R3, R4, R5, R13)]
+{% endif %}
+
+## 5. Quantitativi e messa in riserva
+
+- **Quantità annua gestita (t/anno):** {{ rf.quantita_annua_t | default("[DA COMPLETARE: quantità in t/anno]") }}
+{% if rf.messa_in_riserva_R13 %}
+- È prevista la **messa in riserva (R13)** dei rifiuti in attesa di recupero;
+  vanno rispettate le quantità massime stoccabili e le modalità di deposito
+  previste dalla normativa di settore.
+{% else %}
+- Non è prevista la messa in riserva (R13).
+{% endif %}
+
+## 6. Modalità di gestione e prescrizioni
+
+[DA COMPLETARE: descrizione delle modalità di stoccaggio, delle aree dedicate,
+delle caratteristiche delle materie/prodotti ottenuti dal recupero e del rispetto
+delle condizioni tecniche del decreto applicabile]
+
+---
+
+*Relazione redatta a supporto dell'istanza AUA. Tipologie, codici EER, quantità e
+prescrizioni vanno verificati rispetto alla normativa e alla modulistica vigenti.*

@@ -1,0 +1,76 @@
+# ============ ANAGRAFICA GESTORE ============
+gestore:
+  ragione_sociale: ""            # OBBLIGATORIO
+  forma_giuridica: ""            # es. S.r.l., S.p.A., ditta individuale
+  codice_fiscale: ""             # OBBLIGATORIO
+  partita_iva: ""
+  sede_legale:                   # OBBLIGATORIO
+    indirizzo: ""
+    comune: ""
+    provincia: ""                # sigla, es. CE
+    cap: ""
+  legale_rappresentante:
+    nome: ""
+    cognome: ""
+    codice_fiscale: ""
+    pec: ""                      # necessaria per invio SUAP
+  referente_tecnico:
+    nome: ""
+    cognome: ""
+    email: ""
+    telefono: ""
+
+# ============ IMPIANTO / INSEDIAMENTO ============
+impianto:
+  denominazione: ""              # OBBLIGATORIO
+  indirizzo: ""
+  comune: ""                     # OBBLIGATORIO
+  provincia: ""                  # OBBLIGATORIO — atteso: AV/BN/CE/NA/SA
+  cap: ""
+  foglio: ""                     # dati catastali
+  particella: ""
+  codice_ateco: ""
+  descrizione_attivita: ""       # descrizione sintetica del ciclo produttivo
+  superficie_mq:                 # numero
+  numero_addetti:                # numero
+
+# ============ TITOLO C/D — EMISSIONI IN ATMOSFERA ============
+emissioni_atmosfera:
+  presenti: false                # true se ci sono emissioni in atmosfera
+  regime: ""                     # "ordinaria" (art.269) | "generale" (art.272 c.2)
+  attivita_in_deroga: ""         # se generale: attività dell'Allegato (parte II) richiamato dall'art.272
+  punti_emissione:               # elenco dei punti
+    - sigla: ""                  # es. E1
+      provenienza: ""            # fase/macchinario
+      inquinanti: []             # es. [polveri, COV]
+      portata_nmc_h:             # numero
+      altezza_m:                 # numero
+      impianto_abbattimento: ""  # es. filtro a maniche / nessuno
+
+# ============ TITOLO A — SCARICHI DI ACQUE REFLUE ============
+scarichi:
+  presenti: false
+  tipologie: []                  # tra: industriali, domestiche, meteoriche_dilavamento
+  recapito: ""                   # "fognatura" | "acque_superficiali" | "suolo"
+  corpo_recettore: ""            # denominazione del corpo idrico / gestore fognatura
+  portata_mc_anno:               # numero
+  presenza_sostanze_pericolose: false   # tab.3/A o 5 All.5 Parte III
+  punti_scarico:
+    - sigla: ""                  # es. S1
+      origine: ""                # processo che genera il refluo
+      trattamento: ""            # es. fossa Imhoff / disoleatore / depuratore
+
+# ============ TITOLO G — RECUPERO RIFIUTI (PROCEDURA SEMPLIFICATA) ============
+rifiuti_recupero:
+  presente: false
+  pericolosita: ""               # "non_pericolosi" (DM 5/2/1998) | "pericolosi" (DM 161/2002)
+  operazioni: []                 # codici R: es. [R3, R4, R5, R13]
+  codici_eer: []                 # es. ["170504", "170302"]
+  quantita_annua_t:              # numero (t/anno)
+  messa_in_riserva_R13: false    # true se previsto stoccaggio R13
+
+# ============ ALTRI TITOLI (solo rilevazione nell'MVP) ============
+altri_titoli:
+  utilizzo_agronomico_effluenti: false   # Titolo B (art.112)
+  impatto_acustico: false                # Titolo E (L.447/1995)
+  fanghi_in_agricoltura: false           # Titolo F (D.Lgs.99/1992)
