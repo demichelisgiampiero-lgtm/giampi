@@ -1,0 +1,63 @@
+# Relazione tecnica — Emissioni in atmosfera
+
+**Titolo C / D dell'AUA — DPR 59/2013**
+
+{% set em = emissioni_atmosfera | default({}) %}
+
+## 1. Dati dell'impianto
+
+- **Denominazione:** {{ impianto.denominazione | default("[DA COMPLETARE: denominazione impianto]") }}
+- **Comune:** {{ impianto.comune | default("[DA COMPLETARE: comune]") }} ({{ impianto.provincia | default("[DA COMPLETARE: provincia]") }})
+- **Attività:** {{ impianto.descrizione_attivita | default("[DA COMPLETARE: descrizione del ciclo produttivo]") }}
+
+## 2. Regime autorizzativo
+
+{% if em.regime == "ordinaria" %}
+Le emissioni in atmosfera sono assoggettate ad **autorizzazione in via ordinaria**
+ai sensi dell'**art. 269 del D.Lgs. 152/2006**.
+{% elif em.regime == "generale" %}
+Le emissioni in atmosfera sono assoggettate ad **autorizzazione di carattere generale**
+ai sensi dell'**art. 272, comma 2, del D.Lgs. 152/2006**.
+
+- **Attività in deroga (Allegato richiamato dall'art. 272):** {{ em.attivita_in_deroga | default("[DA COMPLETARE: attività dell'Allegato — Parte II — richiamata]") }}
+{% else %}
+[DA COMPLETARE: regime autorizzativo — "ordinaria" (art. 269) oppure "generale" (art. 272 c. 2)]
+{% endif %}
+
+## 3. Descrizione del ciclo produttivo e delle fasi che generano emissioni
+
+[DA COMPLETARE: descrizione del ciclo produttivo, delle fasi di lavorazione e
+delle relative emissioni in atmosfera (convogliate e/o diffuse)]
+
+## 4. Punti di emissione
+
+{% set punti = em.punti_emissione | default([]) %}
+{% if punti %}
+| Sigla | Provenienza | Inquinanti | Portata (Nmc/h) | Altezza (m) | Impianto di abbattimento |
+|-------|-------------|------------|-----------------|-------------|--------------------------|
+{% for p in punti %}
+| {{ p.sigla | default("[DA COMPLETARE]") }} | {{ p.provenienza | default("[DA COMPLETARE]") }} | {{ (p.inquinanti | join(", ")) if p.inquinanti else "[DA COMPLETARE]" }} | {{ p.portata_nmc_h | default("[DA COMPLETARE]") }} | {{ p.altezza_m | default("[DA COMPLETARE]") }} | {{ p.impianto_abbattimento | default("[DA COMPLETARE]") }} |
+{% endfor %}
+{% else %}
+[DA COMPLETARE: tabella dei punti di emissione (sigla, provenienza, inquinanti,
+portata, altezza, impianto di abbattimento)]
+{% endif %}
+
+## 5. Valori limite di emissione di riferimento
+
+I valori limite di emissione applicabili sono quelli fissati:
+
+- per il regime **ordinario (art. 269)**, dall'autorizzazione, sulla base dei
+  valori limite e delle prescrizioni dell'**Allegato I alla Parte Quinta** del
+  D.Lgs. 152/2006 e dei piani e programmi di qualità dell'aria;
+- per il regime **generale (art. 272 c. 2)**, dall'Allegato tecnico
+  dell'autorizzazione generale adottata dall'Autorità competente, riferito alla
+  specifica attività.
+
+[DA COMPLETARE: prospetto dei valori limite di emissione applicabili per ciascun
+inquinante e relativi metodi di campionamento/analisi]
+
+---
+
+*Relazione redatta a supporto dell'istanza AUA. I valori limite e le prescrizioni
+vanno verificati rispetto alla normativa e alla modulistica vigenti.*

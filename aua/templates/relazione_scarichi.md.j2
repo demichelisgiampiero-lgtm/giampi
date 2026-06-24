@@ -1,0 +1,73 @@
+# Relazione tecnica — Scarichi di acque reflue
+
+**Titolo A dell'AUA — DPR 59/2013 — art. 124 D.Lgs. 152/2006**
+
+{% set sc = scarichi | default({}) %}
+
+## 1. Dati dell'impianto
+
+- **Denominazione:** {{ impianto.denominazione | default("[DA COMPLETARE: denominazione impianto]") }}
+- **Comune:** {{ impianto.comune | default("[DA COMPLETARE: comune]") }} ({{ impianto.provincia | default("[DA COMPLETARE: provincia]") }})
+
+## 2. Tipologia degli scarichi
+
+{% set tipologie = sc.tipologie | default([]) %}
+{% if tipologie %}
+Le acque reflue prodotte dall'insediamento sono delle seguenti tipologie:
+
+{% for tipo in tipologie %}
+- {{ tipo }}
+{% endfor %}
+{% else %}
+[DA COMPLETARE: tipologie di reflui — industriali, domestiche, meteoriche di dilavamento]
+{% endif %}
+
+- **Portata complessiva (mc/anno):** {{ sc.portata_mc_anno | default("[DA COMPLETARE: portata in mc/anno]") }}
+- **Presenza di sostanze pericolose (Tab. 3/A o 5, All. 5, Parte III):** {{ "Sì" if sc.presenza_sostanze_pericolose else "No" }}
+
+## 3. Schema di trattamento
+
+[DA COMPLETARE: descrizione dello schema di trattamento (linea acque, presidi
+depurativi, eventuale pretrattamento) prima dello scarico]
+
+## 4. Recapito e corpo recettore
+
+{% if sc.recapito == "fognatura" %}
+Lo scarico recapita in **pubblica fognatura**.
+{% elif sc.recapito == "acque_superficiali" %}
+Lo scarico recapita in **acque superficiali**.
+{% elif sc.recapito == "suolo" %}
+Lo scarico recapita sul **suolo**.
+{% else %}
+[DA COMPLETARE: recapito dello scarico — fognatura / acque superficiali / suolo]
+{% endif %}
+
+- **Corpo recettore / gestore fognatura:** {{ sc.corpo_recettore | default("[DA COMPLETARE: denominazione corpo idrico o gestore della fognatura]") }}
+
+## 5. Punti di scarico
+
+{% set punti = sc.punti_scarico | default([]) %}
+{% if punti %}
+| Sigla | Origine | Trattamento |
+|-------|---------|-------------|
+{% for p in punti %}
+| {{ p.sigla | default("[DA COMPLETARE]") }} | {{ p.origine | default("[DA COMPLETARE]") }} | {{ p.trattamento | default("[DA COMPLETARE]") }} |
+{% endfor %}
+{% else %}
+[DA COMPLETARE: tabella dei punti di scarico (sigla, origine, trattamento)]
+{% endif %}
+
+## 6. Valori limite di emissione
+
+Lo scarico deve rispettare i **valori limite di emissione** di cui alla
+**Tabella 3 dell'Allegato 5 alla Parte Terza del D.Lgs. 152/2006**, in funzione
+del recapito (acque superficiali o pubblica fognatura). Per lo scarico sul suolo
+si applicano i limiti della Tabella 4 del medesimo Allegato.
+
+[DA COMPLETARE: prospetto dei parametri da monitorare con i relativi valori limite
+applicabili e i metodi analitici di riferimento]
+
+---
+
+*Relazione redatta a supporto dell'istanza AUA. I limiti e le prescrizioni vanno
+verificati rispetto alla normativa e alla modulistica vigenti.*

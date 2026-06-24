@@ -1,0 +1,92 @@
+# ESEMPIO COMPILATO — Officina meccanica con cabina di verniciatura.
+# Caso realistico per i test: emissioni in regime generale (art.272 c.2),
+# scarichi domestici in fognatura, recupero di rifiuti non pericolosi
+# (rottami metallici) con operazioni R13/R4.
+# NOTA: dati anagrafici, indirizzi e identificativi sono fittizi.
+
+# ============ ANAGRAFICA GESTORE ============
+gestore:
+  ragione_sociale: "Autofficina Esposito S.r.l."   # OBBLIGATORIO
+  forma_giuridica: "S.r.l."                          # es. S.r.l., S.p.A., ditta individuale
+  codice_fiscale: "01234567891"                      # OBBLIGATORIO
+  partita_iva: "01234567891"
+  sede_legale:                                       # OBBLIGATORIO
+    indirizzo: "Via delle Industrie, 24"
+    comune: "Caserta"
+    provincia: "CE"                                  # sigla, es. CE
+    cap: "81100"
+  legale_rappresentante:
+    nome: "Antonio"
+    cognome: "Esposito"
+    codice_fiscale: "SPSNTN70A01B963K"
+    pec: "autofficina.esposito@pec.it"               # necessaria per invio SUAP
+  referente_tecnico:
+    nome: "Maria"
+    cognome: "Russo"
+    email: "ing.russo@studiotecnico.it"
+    telefono: "0823 123456"
+
+# ============ IMPIANTO / INSEDIAMENTO ============
+impianto:
+  denominazione: "Officina meccanica e carrozzeria - sede di Caserta"   # OBBLIGATORIO
+  indirizzo: "Via delle Industrie, 24"
+  comune: "Caserta"                                  # OBBLIGATORIO
+  provincia: "CE"                                    # OBBLIGATORIO — atteso: AV/BN/CE/NA/SA
+  cap: "81100"
+  foglio: "45"                                       # dati catastali
+  particella: "812"
+  codice_ateco: "45.20.10"                           # manutenzione e riparazione di autoveicoli
+  descrizione_attivita: >-                           # descrizione sintetica del ciclo produttivo
+    Officina per la riparazione e manutenzione di autoveicoli con annessa
+    carrozzeria. Le lavorazioni comprendono meccanica, lattoneria, stuccatura,
+    carteggiatura e verniciatura in cabina-forno pressurizzata. I rottami
+    metallici derivanti dalle riparazioni sono stoccati e avviati a recupero.
+  superficie_mq: 600                                 # numero
+  numero_addetti: 6                                  # numero
+
+# ============ TITOLO C/D — EMISSIONI IN ATMOSFERA ============
+emissioni_atmosfera:
+  presenti: true                 # true se ci sono emissioni in atmosfera
+  regime: "generale"             # "ordinaria" (art.269) | "generale" (art.272 c.2)
+  attivita_in_deroga: "Verniciatura, laccatura, doratura di oggetti vari in metallo (cicli a base di prodotti vernicianti)"   # attività dell'Allegato (parte II) richiamato dall'art.272
+  punti_emissione:               # elenco dei punti
+    - sigla: "E1"                # es. E1
+      provenienza: "Cabina-forno di verniciatura"   # fase/macchinario
+      inquinanti: [COV, polveri] # es. [polveri, COV]
+      portata_nmc_h: 18000       # numero
+      altezza_m: 9               # numero
+      impianto_abbattimento: "Filtri a secco (pre-filtro su pareti + filtro a tasche sul plenum) e filtri a carboni attivi"  # es. filtro a maniche / nessuno
+    - sigla: "E2"
+      provenienza: "Postazione di carteggiatura/preparazione"
+      inquinanti: [polveri]
+      portata_nmc_h: 6000
+      altezza_m: 7
+      impianto_abbattimento: "Filtro a maniche"
+
+# ============ TITOLO A — SCARICHI DI ACQUE REFLUE ============
+scarichi:
+  presenti: true
+  tipologie: [domestiche]        # tra: industriali, domestiche, meteoriche_dilavamento
+  recapito: "fognatura"          # "fognatura" | "acque_superficiali" | "suolo"
+  corpo_recettore: "Pubblica fognatura comunale gestita da GORI S.p.A."   # denominazione del corpo idrico / gestore fognatura
+  portata_mc_anno: 180           # numero
+  presenza_sostanze_pericolose: false   # tab.3/A o 5 All.5 Parte III
+  punti_scarico:
+    - sigla: "S1"                # es. S1
+      origine: "Servizi igienici e spogliatoi del personale"   # processo che genera il refluo
+      trattamento: "Fossa Imhoff prima dell'immissione in fognatura"   # es. fossa Imhoff / disoleatore / depuratore
+
+# ============ TITOLO G — RECUPERO RIFIUTI (PROCEDURA SEMPLIFICATA) ============
+rifiuti_recupero:
+  presente: true
+  pericolosita: "non_pericolosi"      # "non_pericolosi" (DM 5/2/1998) | "pericolosi" (DM 161/2002)
+  operazioni: [R13, R4]               # codici R: es. [R3, R4, R5, R13]
+  codici_eer: ["170405", "160117", "150104"]   # ferro e acciaio; metalli ferrosi; imballaggi metallici
+  quantita_annua_t: 40                # numero (t/anno)
+  messa_in_riserva_R13: true          # true se previsto stoccaggio R13
+
+# ============ ALTRI TITOLI (solo rilevazione nell'MVP) ============
+altri_titoli:
+  utilizzo_agronomico_effluenti: false   # Titolo B (art.112)
+  impatto_acustico: false                # Titolo E (L.447/1995)
+  fanghi_in_agricoltura: false           # Titolo F (D.Lgs.99/1992)

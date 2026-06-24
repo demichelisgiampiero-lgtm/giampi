@@ -1,0 +1,119 @@
+# Istanza di Autorizzazione Unica Ambientale (AUA)
+
+**Ai sensi del DPR 13 marzo 2013, n. 59**
+
+---
+
+## Allo Sportello Unico per le Attività Produttive (SUAP)
+
+Comune di {{ impianto.comune | default("[DA COMPLETARE: Comune competente]") }}
+({{ impianto.provincia | default("[DA COMPLETARE: provincia]") }})
+
+Per il tramite del SUAP, all'Autorità competente al rilascio
+(Provincia / Città Metropolitana competente per territorio).
+
+**Marca da bollo:** [DA COMPLETARE: estremi marca da bollo da € 16,00 sull'istanza]
+
+---
+
+## 1. Dati del gestore (richiedente)
+
+- **Ragione sociale:** {{ gestore.ragione_sociale | default("[DA COMPLETARE: ragione sociale]") }}
+- **Forma giuridica:** {{ gestore.forma_giuridica | default("[DA COMPLETARE: forma giuridica]") }}
+- **Codice fiscale:** {{ gestore.codice_fiscale | default("[DA COMPLETARE: codice fiscale]") }}
+- **Partita IVA:** {{ gestore.partita_iva | default("[DA COMPLETARE: partita IVA]") }}
+
+### Sede legale
+
+{% set sede = gestore.sede_legale | default({}) %}
+- **Indirizzo:** {{ sede.indirizzo | default("[DA COMPLETARE: indirizzo sede legale]") }}
+- **Comune:** {{ sede.comune | default("[DA COMPLETARE: comune]") }}
+- **Provincia:** {{ sede.provincia | default("[DA COMPLETARE: provincia]") }}
+- **CAP:** {{ sede.cap | default("[DA COMPLETARE: CAP]") }}
+
+## 2. Legale rappresentante
+
+{% set lr = gestore.legale_rappresentante | default({}) %}
+- **Nome:** {{ lr.nome | default("[DA COMPLETARE: nome]") }}
+- **Cognome:** {{ lr.cognome | default("[DA COMPLETARE: cognome]") }}
+- **Codice fiscale:** {{ lr.codice_fiscale | default("[DA COMPLETARE: codice fiscale]") }}
+- **PEC:** {{ lr.pec | default("[DA COMPLETARE: indirizzo PEC per le comunicazioni]") }}
+
+in qualità di legale rappresentante dell'impresa sopra indicata,
+
+## 3. Dati dell'impianto / insediamento produttivo
+
+- **Denominazione:** {{ impianto.denominazione | default("[DA COMPLETARE: denominazione impianto]") }}
+- **Indirizzo:** {{ impianto.indirizzo | default("[DA COMPLETARE: indirizzo impianto]") }}
+- **Comune:** {{ impianto.comune | default("[DA COMPLETARE: comune]") }}
+- **Provincia:** {{ impianto.provincia | default("[DA COMPLETARE: provincia]") }}
+- **CAP:** {{ impianto.cap | default("[DA COMPLETARE: CAP]") }}
+
+### Dati catastali
+
+- **Foglio:** {{ impianto.foglio | default("[DA COMPLETARE: foglio catastale]") }}
+- **Particella:** {{ impianto.particella | default("[DA COMPLETARE: particella]") }}
+
+### Inquadramento dell'attività
+
+- **Codice ATECO:** {{ impianto.codice_ateco | default("[DA COMPLETARE: codice ATECO]") }}
+- **Descrizione attività:** {{ impianto.descrizione_attivita | default("[DA COMPLETARE: descrizione sintetica del ciclo produttivo]") }}
+- **Superficie (mq):** {{ impianto.superficie_mq | default("[DA COMPLETARE: superficie in mq]") }}
+- **Numero addetti:** {{ impianto.numero_addetti | default("[DA COMPLETARE: numero addetti]") }}
+
+## 4. Titoli ambientali richiesti con la presente AUA
+
+L'Autorizzazione Unica Ambientale qui richiesta sostituisce e coordina i seguenti
+titoli ambientali (art. 3 DPR 59/2013):
+
+{% if titoli %}
+| Cod. | Titolo | Riferimento normativo |
+|------|--------|-----------------------|
+{% for t in titoli %}
+| {{ t.codice | default("-") }} | {{ t.nome | default("[DA COMPLETARE: titolo]") }} | {{ t.riferimento | default("[DA COMPLETARE: riferimento]") }} |
+{% endfor %}
+{% else %}
+[DA COMPLETARE: elenco dei titoli ambientali richiesti — nessun titolo determinato dal motore di applicabilità]
+{% endif %}
+
+## 5. Dichiarazioni sostitutive (DPR 28 dicembre 2000, n. 445)
+
+Il sottoscritto legale rappresentante, **consapevole delle sanzioni penali**
+previste dall'art. 76 del DPR 445/2000 in caso di dichiarazioni mendaci e della
+decadenza dai benefici (art. 75) conseguente a dichiarazioni non veritiere, ai
+sensi degli artt. 46 e 47 del medesimo decreto, sotto la propria responsabilità
+
+**DICHIARA:**
+
+- che i dati e le informazioni contenuti nella presente istanza e nei relativi
+  allegati corrispondono al vero;
+- che l'impianto **non è soggetto** alla disciplina dell'Autorizzazione Integrata
+  Ambientale (AIA) di cui al Titolo III-bis della Parte Seconda del D.Lgs. 152/2006;
+- di impegnarsi a comunicare ogni variazione dei dati dichiarati e a rispettare
+  le prescrizioni dell'atto autorizzativo che verrà rilasciato;
+- [DA COMPLETARE: ulteriori dichiarazioni richieste dalla modulistica AUA vigente
+  di Regione Campania / Provincia competente].
+
+## 6. Durata dell'autorizzazione
+
+L'Autorizzazione Unica Ambientale ha **durata di 15 (quindici) anni** dalla data
+di rilascio, ai sensi dell'art. 3, comma 6, del DPR 59/2013.
+
+## 7. Allegati
+
+- [DA COMPLETARE: elenco degli allegati tecnici e amministrativi richiesti
+  (relazioni tecniche, planimetrie, copia documento d'identità, ricevuta versamenti)].
+
+---
+
+## 8. Sottoscrizione
+
+Luogo e data: [DA COMPLETARE: luogo e data]
+
+Il Legale Rappresentante
+{{ lr.nome | default("") }} {{ lr.cognome | default("") }}
+
+**Firma digitale del legale rappresentante**
+(documento sottoscritto digitalmente ai sensi del D.Lgs. 82/2005 — CAD)
+
+[Spazio per la firma digitale]
