@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin.json",
+  "name": "video-analysis",
+  "description": "Comandi per analizzare video: /analizza-video (file locale) e /analizza-video-url (URL/YouTube). Estrae metadati, campiona fotogrammi, trascrive l'audio e produce un riepilogo in italiano.",
+  "version": "1.0.0",
+  "author": {
+    "name": "demichelisgiampiero-lgtm"
+  },
+  "keywords": ["video", "ffmpeg", "yt-dlp", "analisi", "trascrizione"]
+}
