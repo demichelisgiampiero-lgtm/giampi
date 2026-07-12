@@ -6,10 +6,17 @@
         "source": "github",
         "repo": "thedotmack/claude-mem"
       }
+    },
+    "giampi": {
+      "source": {
+        "source": "github",
+        "repo": "demichelisgiampiero-lgtm/giampi"
+      }
     }
   },
   "enabledPlugins": {
-    "claude-mem@thedotmack": true
+    "claude-mem@thedotmack": true,
+    "video-analysis@giampi": true
   },
   "hooks": {
     "SessionStart": [
