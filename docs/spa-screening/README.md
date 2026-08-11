@@ -19,6 +19,7 @@ da esaminare e usare come esempio.
 | File | Oggetto | Analisi |
 |---|---|---|
 | `esempi/19881843-Studio_preliminare_ambientale_1.pdf` | Cava di sabbia in loc. Pianaiello, Mugnano del Cardinale (AV) — screening integrato da Valutazione di Incidenza (SIC IT8040017 "Pietra Maula"), 94 pp., 2018 | [`analisi-cava-mugnano-2018.md`](analisi-cava-mugnano-2018.md) |
+| `esempi/SPA_ExCavaVentrone_art19_20260806_v17_BOZZA.docx` | Ex Cava Ventrone, San Felice a Cancello (CE) — recupero ambientale mediante ritombamento, screening ex art. 19 integrato da VIncA (ZSC IT8040006), bozza di lavoro 2026 | [`revisione-ex-cava-ventrone-2026.md`](revisione-ex-cava-ventrone-2026.md) |
 
 ### Perché il download è bloccato
 
