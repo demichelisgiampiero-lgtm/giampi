@@ -10,8 +10,15 @@ da esaminare e usare come esempio.
 |---|---|
 | Individuazione fonti sul portale VIA-VAS | fatto (vedi sotto) |
 | Griglia normativa di lettura | fatto → [`struttura-spa.md`](struttura-spa.md) |
-| Download dei PDF | **bloccato** — egress di rete chiuso |
-| Analisi dell'esempio reale | in attesa dei PDF |
+| Primo esemplare acquisito | fatto (caricamento manuale) → `esempi/` |
+| Analisi critica del primo esemplare | fatto → [`analisi-cava-mugnano-2018.md`](analisi-cava-mugnano-2018.md) |
+| Download degli altri PDF dal portale | **bloccato** — egress di rete chiuso |
+
+## Esemplari
+
+| File | Oggetto | Analisi |
+|---|---|---|
+| `esempi/19881843-Studio_preliminare_ambientale_1.pdf` | Cava di sabbia in loc. Pianaiello, Mugnano del Cardinale (AV) — screening integrato da Valutazione di Incidenza (SIC IT8040017 "Pietra Maula"), 94 pp., 2018 | [`analisi-cava-mugnano-2018.md`](analisi-cava-mugnano-2018.md) |
 
 ### Perché il download è bloccato
 
