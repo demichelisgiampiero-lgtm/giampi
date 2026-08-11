@@ -1,0 +1,4 @@
+# PDF scaricati dal portale VIAVAS (non versionati: file di grandi dimensioni)
+spa/pdf/
+*.part
+*.non-pdf

@@ -1,0 +1,33 @@
+# Studi Preliminari Ambientali (SPA) - Portale VIAVAS Regione Campania
+#
+# Formato:  <nome_file_destinazione><TAB o spazi><URL>
+# Le righe che iniziano con # sono commenti.
+#
+# I procedimenti sono consultabili su:
+#   - Elenco Regionale Progetti:
+#     https://servizi-digitali.regione.campania.it/Public/AccessoPubblico/ViaVas/ElencoProgetti?Tipo=via
+#   - Area VIA / Verifica di assoggettabilita':
+#     https://viavas.regione.campania.it/opencms/opencms/VIAVAS/VIA_Verifica_Ass_NP
+#
+# Gli allegati seguono il pattern:
+#   http://viavas.regione.campania.it/opencms/export/sites/default/VIAVAS/download/allegati/<ISTRUTTORE>/<ID_PROCEDIMENTO>/<NOME_FILE>.pdf
+# dove <ISTRUTTORE> e' la cartella del funzionario istruttore (es. Rizzotto,
+# D_Alterio, Del_Piano) e <ID_PROCEDIMENTO> il numero del procedimento.
+#
+# --- CANDIDATI INDIVIDUATI (da verificare rispetto al settore di interesse) ---
+
+spa_7982_del_piano.pdf	http://viavas.regione.campania.it/opencms/export/sites/default/VIAVAS/download/allegati/Del_Piano/7982/studio_preliminare_ambientale.pdf
+spa_8722_rizzotto.pdf	http://viavas.regione.campania.it/opencms/export/sites/default/VIAVAS/download/allegati/Rizzotto/8722/STUDIO_PRELIMINARE_AMBIENTALE.pdf
+spa_8264_rizzotto.pdf	http://viavas.regione.campania.it/opencms/export/sites/default/VIAVAS/download/allegati/Rizzotto/8264/Studio_preliminare_ambientale.pdf
+spa_8263_rizzotto_all7.pdf	https://viavas.regione.campania.it/opencms/export/sites/default/VIAVAS/download/allegati/Rizzotto/8263/ALLEGATO_7-STUDIO_PRELIMINARE_AMBIENTALE.pdf
+spa_8184_rizzotto_1di2.pdf	https://viavas.regione.campania.it/opencms/export/sites/default/VIAVAS/download/allegati/Rizzotto/8184/Studio_Preliminare_Ambientale-1di2.pdf
+spa_8441_rizzotto.pdf	http://viavas.regione.campania.it/opencms/export/sites/default/VIAVAS/download/allegati/Rizzotto/8441/Studio_preliminare_ambientale.pdf
+spa_8667_rizzotto_marcavi.pdf	http://viavas.regione.campania.it/opencms/export/sites/default/VIAVAS/download/allegati/Rizzotto/8667/Studio_Preliminare_Ambientale.pdf
+spa_8104_dalterio.pdf	http://viavas.regione.campania.it/opencms/export/sites/default/VIAVAS/download/allegati/D_Alterio/8104/STUDIO_PRELIMINARE_AMBIENTALE.pdf
+spa_8180_dalterio.pdf	http://viavas.regione.campania.it/opencms/export/sites/default/VIAVAS/download/allegati/D_Alterio/8180/V00_STUDIO_PRELIMINARE_AMBIENTALE.pdf
+spa_8238_dalterio_integrato.pdf	http://viavas.regione.campania.it/opencms/export/sites/default/VIAVAS/download/allegati/D_Alterio/8238/Studio_Preliminare_Ambientale_Integrato.pdf
+
+# --- RIFERIMENTO NORMATIVO / METODOLOGICO (utile come griglia di confronto) ---
+
+indirizzi_SPA_gennaio2022_rev01.pdf	http://viavas.regione.campania.it/opencms/export/sites/default/VIAVAS/download/DGR_613_28122021/INDIRIZZI_SPA_Gennaio2022_rev01.pdf
+disciplinare_procedurale_VIA_2021.pdf	http://viavas.regione.campania.it/opencms/export/sites/default/VIAVAS/download/DGR_613_28122021/Allegato_197222.pdf
