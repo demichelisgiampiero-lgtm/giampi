@@ -103,6 +103,25 @@ Finche' il cancello esce 1, **l'analisi non e' finita**. Non aggirarlo: se un
 documento e' irrecuperabile, fallo escludere dall'utente con una motivazione,
 che finira' sotto i suoi occhi nella tabella di copertura.
 
+Poi il secondo controllo, che non riguarda quanti documenti sono stati letti ma
+**se cio' che se ne e' scritto regge**:
+
+```
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/qualita.py ancoraggio "<cartella>"
+```
+
+Ogni fatto duro dichiarato in una scheda - date, protocolli, importi, articoli -
+viene cercato nel testo del documento. Distingue due cose che sembrano uguali e
+non lo sono: `DA_VERIFICARE` significa che il dato nel documento **non esiste**,
+ed e' un dato inventato da correggere subito; `FUORI_INDICE` significa che il
+dato c'e' nel file ma l'indice non l'ha raccolto - tipicamente il protocollo
+nell'intestazione di un Word, che l'estrattore di `commessa-rag` non legge - e
+allora quel riferimento si puo' riportare ma **non citare come fonte:pagina**.
+
+Su un fascicolo destinato al contraddittorio, aggiungi la seconda lettura a
+campione (`qualita.py campione`, poi `rilettura` e `confronta`), facendo
+rileggere i documenti a un agente che **non veda la scheda esistente**.
+
 ## Fase 4 — Merito
 
 Ora, e solo ora, l'analisi di merito. Hai due basi complementari:

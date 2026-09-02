@@ -217,7 +217,12 @@ python3 plugins/commessa-forense/scripts/copertura.py parziale "<CARTELLA>" 7 \
 
 La lettura parziale dichiarata è legittima. Quella spacciata per integrale no.
 
-### ▌CANCELLO 2 — Copertura
+### ▌CANCELLO 2 — Copertura e attendibilità della lettura
+
+Due controlli, perché una copertura senza attendibilità non vale nulla: aver
+letto tutto ma male non è meglio che non aver letto.
+
+**a) Ho guardato tutto?**
 
 ```bash
 python3 plugins/commessa-forense/scripts/copertura.py stato "<CARTELLA>"
@@ -240,6 +245,63 @@ mute sono di norma proprio quelle firmate.
 python3 plugins/commessa-forense/scripts/copertura.py escludi "<CARTELLA>" 4 \
   --motivo "verbale acquisito a scanner, OCR non riuscito: contenuto NON acquisito"
 ```
+
+**b) Quello che ho scritto sui documenti è vero?**
+
+```bash
+python3 plugins/commessa-forense/scripts/qualita.py ancoraggio "<CARTELLA>"
+```
+
+Ogni scheda contiene fatti duri — date, protocolli, importi, articoli, quantità
+— e ognuno viene cercato nel testo del documento. Il confronto è **per valore e
+non per forma**: `121.500,00`, `121500.0` e `121.500` sono lo stesso importo, e
+segnalarli come diversi produrrebbe falsi allarmi a raffica.
+
+| Esito | Significato | Cosa fare |
+|---|---|---|
+| `ANCORATA` | ogni dato dichiarato si ritrova nel documento | nulla |
+| `DA_VERIFICARE` | **il dato non esiste nel documento** | bloccante: correggere la scheda prima di usarne i numeri |
+| `FUORI_INDICE` | il dato è nel file ma l'indice non l'ha raccolto | il dato non è citabile finché non si ripara l'estrazione |
+| `SENZA_APPIGLI` | la scheda non contiene nulla di controllabile | rileggere il documento |
+| `GENERICA` | scheda troppo breve o di rito | rileggere il documento |
+
+`DA_VERIFICARE` è il caso grave: significa che chi ha letto ha scritto un dato
+che nel documento non c'è. In una riserva un numero inventato è il rilievo che
+fa cadere l'affermazione che sostiene.
+
+`FUORI_INDICE` non è colpa di chi ha letto: è la catena che perde contenuto. La
+causa tipica è che l'estrattore `.docx` di `commessa-rag` raccoglie paragrafi e
+tabelle **ma non intestazioni e piè di pagina** — ed è lì che negli atti
+italiani stanno numero di protocollo e data. Verificato: `Prot. 4471 del
+14/03/2024` è nel file e non nell'indice. Finché non è risolto, quei riferimenti
+si possono leggere ma **non citare**: vanno riportati come dato di scheda, non
+come citazione `fonte:pagina`.
+
+**c) Seconda lettura a campione** (facoltativa, per fascicoli che finiranno in
+contraddittorio)
+
+```bash
+python3 plugins/commessa-forense/scripts/qualita.py campione "<CARTELLA>" --quota 0.15
+```
+
+Sceglie chi rileggere dando la precedenza a dove sbagliare costa di più: le
+schede già segnalate, le letture dichiarate parziali, quelle che portano gli
+importi più alti, più un sorteggio del resto **con seme fisso**, perché una
+verifica che non si può ripetere non è una verifica.
+
+Rileggi quei documenti **senza guardare la scheda esistente** — altrimenti non è
+una seconda lettura, è una conferma — e registra:
+
+```bash
+python3 plugins/commessa-forense/scripts/qualita.py rilettura "<CARTELLA>" --da-stdin <<'FINE'
+{"id":21,"sintesi":"..."}
+FINE
+python3 plugins/commessa-forense/scripts/qualita.py confronta "<CARTELLA>"
+```
+
+Il confronto segnala solo le **contraddizioni** sullo stesso tipo di dato. Che
+il secondo lettore abbia notato un dettaglio in più non è un errore del primo:
+è il motivo per cui si rilegge.
 
 ---
 
@@ -318,6 +380,8 @@ procurarselo prima di usarle.
 | Un `.xls` non si apre | è un `.xlsx` rinominato | `integrita.py` lo riconosce dai byte iniziali; per `rag.py` rinominare il file |
 | `verify` non esiste | `commessa-rag` è la v1 | aggiornare la skill, oppure dichiarare che la bozza **non è verificata** |
 | Il cancello 2 non passa mai | qualche documento non è mai stato registrato | `copertura.py da-leggere` per vedere quali |
+| Un protocollo non si trova nell'indice | sta nell'intestazione del Word, che `rag.py` non legge | leggerlo dalla scheda, non citarlo come `fonte:pagina` |
+| `ancoraggio` segnala un importo corretto | forme numeriche diverse | il confronto è per valore: se accade, è un difetto da segnalare |
 
 ## Limiti noti, da dichiarare all'utente
 
