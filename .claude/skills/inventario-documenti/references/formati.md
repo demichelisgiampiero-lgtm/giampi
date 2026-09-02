@@ -64,14 +64,26 @@ Alzarla se molte scansioni passano inosservate; abbassarla solo se il fascicolo
 contiene legittimamente pagine quasi vuote (frontespizi, separatori).
 
 **PDF misti.** Un fascicolo unico che contiene sia pagine native sia scansioni
-supera il controllo di densita' grazie alle pagine native, e le scansioni
-restano fuori senza segnalazione. E' il caso piu' insidioso. Se un PDF voluminoso
-rende molto meno testo di quanto ci si aspetti dal numero di pagine, forzare
-l'OCR su quel file:
+e' il caso piu' insidioso, perche' le pagine native tengono alta la densita'
+media e il documento sembra estratto per intero mentre le pagine acquisite a
+scanner spariscono senza lasciare traccia. Per questo il controllo non si limita
+alla media: confronta le pagine dichiarate dal PDF con quelle che hanno prodotto
+testo, e se qualcuna resta muta assegna lo stato `PDF_MISTO` indicando **quali
+pagine**. E' bloccante, perche' sono contenuto che non abbiamo — e in un
+registro di contabilita' le pagine scansionate sono di norma proprio quelle
+firmate.
+
+Se l'OCR automatico non basta, forzarlo a mano e rilanciare l'estrazione:
 ```bash
 ocrmypdf --redo-ocr --skip-text -l ita "file.pdf" "file_ocr.pdf"
 ```
-e rilanciare l'estrazione.
+
+**L'estensione che mente.** Un `.xls` salvato da Excel recente e' spesso un
+`.xlsx`, un `.doc` rinominato a mano e' un `.docx`, un allegato di posta puo'
+arrivare senza estensione. Il formato viene percio' riconosciuto dai byte
+iniziali del file, non dal nome; quando i due non coincidono il documento viene
+comunque letto e la discrepanza compare nella nota, perche' di solito segnala
+un file rinominato per sbaglio.
 
 **Fogli nascosti negli Excel.** Vengono estratti e marcati `[NASCOSTO]`. Nei CME
 e' spesso li' che stanno le analisi prezzi intermedie: sono dati di lavoro, e in

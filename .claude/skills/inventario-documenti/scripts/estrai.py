@@ -27,6 +27,14 @@ from xml.etree import ElementTree as ET
 # Sotto questa densita' di caratteri per pagina un PDF e' quasi certamente
 # una scansione: il testo "estratto" sono solo intestazioni o timbri digitali.
 SOGLIA_CARATTERI_PER_PAGINA = 100
+# Sotto questa soglia una singola pagina si considera muta (nessun testo utile).
+SOGLIA_PAGINA_MUTA = 50
+EXT2CAT_RUNTIME = {
+    ".pdf": "pdf", ".docx": "testo", ".doc": "testo", ".rtf": "testo", ".odt": "testo",
+    ".xlsx": "foglio", ".xls": "foglio", ".ods": "foglio", ".pptx": "presentazione",
+    ".ppt": "presentazione", ".odp": "presentazione", ".msg": "mail", ".eml": "mail",
+    ".png": "immagine", ".jpg": "immagine", ".zip": "archivio",
+}
 LINGUE_OCR = "ita+eng"
 
 
@@ -265,27 +273,72 @@ def _testo_da_contenuto(cont: bytes) -> str:
     return re.sub(r"[ \t]{2,}", " ", re.sub(r"\n{3,}", "\n\n", "".join(pezzi)))
 
 
+def _oggetti_pdf(dato: bytes):
+    return {int(m.group(1)): m.group(2)
+            for m in re.finditer(rb"(\d+)\s+0\s+obj\b(.*?)\bendobj", dato, re.S)}
+
+
+def _flusso(corpo: bytes) -> bytes:
+    import re as _re
+    m = _re.search(rb"stream\r?\n", corpo)
+    if not m:
+        return b""
+    grezzo = corpo[m.end():]
+    f = grezzo.rfind(b"endstream")
+    if f >= 0:
+        grezzo = grezzo[:f]
+    grezzo = grezzo.rstrip(b"\r\n")
+    try:
+        return zlib.decompress(grezzo)
+    except zlib.error:
+        try:
+            return zlib.decompressobj().decompress(grezzo)
+        except Exception:
+            return grezzo
+
+
 def pdf_stdlib(p: Path):
     """Ultimo ripiego, senza alcuna dipendenza esterna.
 
-    Non regge PDF complessi quanto poppler, ma copre i PDF generati
-    digitalmente (che sono la maggioranza degli atti di gara e di contabilita')
-    e soprattutto permette al controllo di densita' di funzionare comunque:
-    meglio un testo imperfetto ma misurabile che un file dichiarato illeggibile.
+    Estrae pagina per pagina e non salta quelle prive di testo: per esse emette
+    un segmento vuoto. L'allineamento conta due volte. Serve a chi cita un
+    documento per pagina, e soprattutto permette di accorgersi delle pagine
+    scansionate dentro un PDF altrimenti nativo: se le pagine mute sparissero
+    dal risultato, il documento sembrerebbe integro pur essendo monco.
     """
     dato = p.read_bytes()
     if not dato.startswith(b"%PDF-"):
         return None, 0, "l'intestazione non e' quella di un PDF"
     if re.search(rb"/Encrypt\b", dato):
         return None, 0, "PDF cifrato"
-    pagine = len(re.findall(rb"/Type\s*/Page(?![s])", dato)) or 1
+
+    oggetti = _oggetti_pdf(dato)
+    pagine = [c for c in oggetti.values() if re.search(rb"/Type\s*/Page\b(?!s)", c)]
+    if pagine:
+        testi = []
+        for corpo in pagine:
+            rif = re.search(rb"/Contents\s+(?:(\d+)\s+0\s+R|\[(.*?)\])", corpo, re.S)
+            pezzi = []
+            if rif:
+                numeri = ([int(rif.group(1))] if rif.group(1)
+                          else [int(x) for x in re.findall(rb"(\d+)\s+0\s+R", rif.group(2))])
+                for n in numeri:
+                    cont = _flusso(oggetti.get(n, b""))
+                    if b"Tj" in cont or b"TJ" in cont:
+                        pezzi.append(_testo_da_contenuto(cont))
+            testi.append("\n".join(pezzi))
+        return "\f".join(testi), len(pagine), ""
+
+    # Nessun oggetto pagina raggiungibile: succede con gli xref compressi
+    # (PDF 1.5+). Si ripiega sulla scansione grezza dei flussi, accettando di
+    # perdere l'allineamento ma non il contenuto.
+    conta = len(re.findall(rb"/Type\s*/Page(?![s])", dato)) or 1
     testi = []
     for m in re.finditer(rb"stream\r?\n", dato):
-        inizio = m.end()
-        fine = dato.find(b"endstream", inizio)
-        if fine < 0:
+        f = dato.find(b"endstream", m.end())
+        if f < 0:
             continue
-        grezzo = dato[inizio:fine].rstrip(b"\r\n")
+        grezzo = dato[m.end():f].rstrip(b"\r\n")
         try:
             cont = zlib.decompress(grezzo)
         except zlib.error:
@@ -295,12 +348,24 @@ def pdf_stdlib(p: Path):
                 cont = grezzo
         if b"Tj" in cont or b"TJ" in cont:
             testi.append(_testo_da_contenuto(cont))
-    if not testi:
-        # Nessun operatore di testo: e' una scansione pura. Restituire stringa
-        # vuota (non None) e' voluto: fa scattare il controllo di densita'
-        # e quindi l'OCR, invece di far credere che il file sia illeggibile.
-        return "", pagine, ""
-    return "\f".join(testi), pagine, ""
+    return "\f".join(testi), conta, ""
+
+
+def _pagine_mute(testo: str, dichiarate: int):
+    """Quali pagine non hanno prodotto testo.
+
+    E' il controllo che smaschera il PDF misto: un fascicolo unico in cui alcune
+    pagine sono native e altre acquisite a scanner. La densita' media non lo
+    rivela, perche' le pagine native la tengono alta e il documento sembra
+    perfettamente estratto; ma le pagine mute sono contenuto che non abbiamo, e
+    sono spesso proprio quelle firmate.
+    """
+    segmenti = testo.split("\f")
+    if dichiarate and len(segmenti) == dichiarate:
+        mute = [i for i, s in enumerate(segmenti, 1) if len(s.strip()) < SOGLIA_PAGINA_MUTA]
+        return len(mute), mute
+    con_testo = sum(1 for s in segmenti if len(s.strip()) >= SOGLIA_PAGINA_MUTA)
+    return max(0, dichiarate - con_testo), []
 
 
 def leggi_pdf(p: Path, ocr_modo):
@@ -318,21 +383,34 @@ def leggi_pdf(p: Path, ocr_modo):
         if ocr_modo != "no":
             t, motore, e2 = pdf_ocr(p)
             if t:
-                return t, max(1, t.count("\f")), "OCR_OK", motore, ""
+                return t, max(1, t.count("\f") + 1), "OCR_OK", motore, ""
             return "", 0, "MANCA_STRUMENTO", "", f"{err}; {e2}"
         return "", 0, "MANCA_STRUMENTO", "", err + " (installare poppler-utils o pypdf)"
 
     pagine = max(pagine, 1)
-    densita = len(testo.strip()) / pagine
-    if densita < SOGLIA_CARATTERI_PER_PAGINA:
+    n_mute, quali = _pagine_mute(testo, pagine)
+    con_testo = pagine - n_mute
+
+    def con_ocr(motivo, stato_se_fallisce):
+        """Tenta l'OCR; se manca o non migliora, resta lo stato bloccante."""
         if ocr_modo == "no":
-            return testo, pagine, "RICHIEDE_OCR", metodo_base, \
-                   f"solo {densita:.0f} caratteri/pagina: e' una scansione"
+            return testo, pagine, stato_se_fallisce, metodo_base, motivo
         t, motore, e2 = pdf_ocr(p)
         if t and len(t.strip()) > len(testo.strip()):
-            return t, max(1, t.count("\f")), "OCR_OK", motore, ""
-        return testo, pagine, "RICHIEDE_OCR", metodo_base, \
-               f"solo {densita:.0f} caratteri/pagina; OCR non riuscito: {e2}"
+            return t, max(pagine, t.count("\f") + 1), "OCR_OK", motore, ""
+        return testo, pagine, stato_se_fallisce, metodo_base, f"{motivo}; OCR non riuscito: {e2}"
+
+    if con_testo == 0:
+        return con_ocr(f"nessuna delle {pagine} pagine produce testo: e' una scansione",
+                       "RICHIEDE_OCR")
+    if n_mute > 0:
+        dove = ((" (pagine " + ", ".join(map(str, quali[:12]))
+                 + ("..." if len(quali) > 12 else "") + ")") if quali else "")
+        return con_ocr(f"PDF misto: {n_mute} pagine su {pagine} non producono testo{dove};"
+                       f" quel contenuto NON e' stato acquisito", "PDF_MISTO")
+    densita = len(testo.strip()) / pagine
+    if densita < SOGLIA_CARATTERI_PER_PAGINA:
+        return con_ocr(f"solo {densita:.0f} caratteri/pagina: probabile scansione", "RICHIEDE_OCR")
     return testo, pagine, "OK", metodo_base, ""
 
 
@@ -403,10 +481,70 @@ def via_libreoffice(p: Path, formato="txt"):
         return dest, ""
 
 
+def tipo_reale(p: Path, ext: str):
+    """Riconosce il formato dai byte iniziali, non dall'estensione.
+
+    Nei fascicoli reali l'estensione mente spesso: un .xls salvato da Excel
+    recente e' in realta' un .xlsx, un .doc rinominato a mano e' un .docx, un
+    allegato di posta arriva senza estensione. Fidarsi del nome del file
+    manderebbe questi documenti sul convertitore sbagliato, che fallisce e li
+    fa finire tra gli irrecuperabili pur essendo perfettamente leggibili.
+
+    Restituisce (estensione_effettiva, avviso) dove l'avviso e' non vuoto solo
+    quando il contenuto smentisce l'estensione: e' un'informazione che l'utente
+    deve vedere, perche' spesso segnala un file rinominato per sbaglio.
+    """
+    try:
+        with p.open("rb") as f:
+            testa = f.read(8)
+    except OSError:
+        return ext, ""
+
+    def esito(vero):
+        if vero == ext:
+            return ext, ""
+        return vero, f"estensione {ext or '(assente)'} ma il contenuto e' {vero}"
+
+    if testa.startswith(b"%PDF-"):
+        return esito(".pdf")
+    if testa.startswith(b"PK\x03\x04"):
+        try:
+            with zipfile.ZipFile(p) as z:
+                nomi = z.namelist()
+        except (zipfile.BadZipFile, OSError):
+            return ext, ""
+        if "word/document.xml" in nomi:
+            return esito(".docx")
+        if "xl/workbook.xml" in nomi:
+            return esito(".xlsx")
+        if "ppt/presentation.xml" in nomi:
+            return esito(".pptx")
+        if any(n.startswith("content.xml") for n in nomi):
+            # OpenDocument: lo tratta LibreOffice, ma almeno non finisce
+            # sul percorso sbagliato per colpa del nome.
+            return esito(ext if ext in (".odt", ".ods", ".odp") else ".odt")
+        return esito(".zip")
+    if testa.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+        # Contenitore OLE2: sono i vecchi formati Office (.doc .xls .ppt) e i .msg.
+        if ext in (".doc", ".xls", ".ppt", ".msg"):
+            return ext, ""
+        return ".doc", f"estensione {ext or '(assente)'} ma il contenuto e' un file Office legacy"
+    if testa.startswith(b"{\\rt"):
+        return esito(".rtf")
+    if testa[:4] in (b"\x89PNG",) or testa[:3] == b"\xff\xd8\xff" or testa[:4] == b"GIF8":
+        return esito(".png" if testa[:4] == b"\x89PNG" else ".jpg")
+    return ext, ""
+
+
 def estrai_uno(v: dict, radice: Path, cartella_testi: Path, ocr_modo: str):
     p = radice / v["percorso"]
     cat, ext = v["categoria"], v["ext"]
     testo, pagine, stato, metodo, nota = "", 0, "ERRORE", "", ""
+    ext_reale, avviso = tipo_reale(p, ext)
+    if avviso:
+        ext = ext_reale
+        cat = EXT2CAT_RUNTIME.get(ext, cat)
+        nota = avviso
     try:
         if cat in ("immagine", "cad", "archivio"):
             stato, nota = "NON_TESTUALE", "nessun testo da estrarre per natura del file"
@@ -489,9 +627,9 @@ def estrai_uno(v: dict, radice: Path, cartella_testi: Path, ocr_modo: str):
                         f"### metodo={metodo} pagine={pagine} caratteri={len(testo)}\n\n")
         dest.write_text(intestazione + testo, encoding="utf-8")
         v["testo"] = str(dest.name)
+    note = [x for x in (v.get("nota") or "", nota) if x]
     v.update(estrazione=stato, metodo=metodo, caratteri=len(testo.strip()),
-             pagine=pagine, nota=(v.get("nota") or "") and v["nota"] + "; " or "")
-    v["nota"] = (v["nota"] + nota).strip("; ")
+             pagine=pagine, nota="; ".join(dict.fromkeys(note)))
     return v
 
 

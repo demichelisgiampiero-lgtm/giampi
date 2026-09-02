@@ -15,6 +15,19 @@ Il file e' una scansione e non abbiamo il suo contenuto.
    della risposta**, non solo nella tabella. Un verbale di sospensione non letto
    puo' ribaltare la ricostruzione dei fatti.
 
+## `PDF_MISTO`
+
+Il documento e' in parte nativo e in parte scansionato: la nota dice quali pagine
+sono mute. Il testo delle altre pagine e' disponibile e leggibile, ma **quelle
+pagine no**, e in un registro di contabilita' o in un fascicolo di verbali sono
+spesso le pagine firmate.
+
+Si risolve come una scansione: installare l'OCR e rilanciare con
+`--solo-mancanti`, oppure forzare `ocrmypdf --redo-ocr --skip-text`. Se non e'
+possibile, escludere motivando **e indicando quali pagine mancano**, perche' e'
+un'informazione diversa da "documento non letto": il resto del documento e'
+stato acquisito.
+
 ## `MANCA_STRUMENTO`
 
 Il messaggio nella nota dice quale programma serve. Se e' un `.msg` isolato, in
@@ -23,9 +36,10 @@ Outlook come `.eml`, che si legge senza dipendenze.
 
 ## `ERRORE` / `PROTETTO`
 
-- *archivio Office corrotto o file rinominato*: capita spesso che un `.xls` sia
-  in realta' un `.xlsx`, o viceversa. Verificare con `file "nome"` e correggere
-  l'estensione.
+- *archivio Office corrotto*: il riconoscimento per byte iniziali gestisce da
+  solo i file con l'estensione sbagliata (che compaiono con la nota «estensione
+  .xls ma il contenuto e' .xlsx»), quindi qui si tratta di un file davvero
+  danneggiato. Verificare con `file "nome"` e chiedere all'utente una copia sana.
 - *PDF cifrato*: chiedere la password all'utente, oppure, se il PDF e' solo
   protetto in scrittura, `qpdf --decrypt in.pdf out.pdf`.
 - *permesso negato*: il file e' aperto in un altro programma o appartiene a un
