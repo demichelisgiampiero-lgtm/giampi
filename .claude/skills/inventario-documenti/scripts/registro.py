@@ -23,8 +23,8 @@ from pathlib import Path
 # testo per natura del file, o e' una copia di un documento gia' letto.
 ESTRAZIONE_ACCETTABILE = {"OK", "OCR_OK", "NON_TESTUALE", "DUPLICATO", "VUOTO"}
 # Stati che bloccano: c'e' contenuto che non abbiamo, e fingere di no e' il bug.
-ESTRAZIONE_BLOCCANTE = {"DA_FARE", "RICHIEDE_OCR", "PDF_MISTO", "MANCA_STRUMENTO",
-                        "ERRORE", "PROTETTO"}
+ESTRAZIONE_BLOCCANTE = {"DA_FARE", "RICHIEDE_OCR", "PDF_MISTO", "TESTO_INSUFFICIENTE",
+                        "MANCA_STRUMENTO", "ERRORE", "PROTETTO"}
 # Un file senza testo da leggere non richiede lettura.
 NON_RICHIEDE_LETTURA = {"NON_TESTUALE", "DUPLICATO", "VUOTO"}
 

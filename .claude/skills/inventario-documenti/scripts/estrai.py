@@ -29,6 +29,8 @@ from xml.etree import ElementTree as ET
 SOGLIA_CARATTERI_PER_PAGINA = 100
 # Sotto questa soglia una singola pagina si considera muta (nessun testo utile).
 SOGLIA_PAGINA_MUTA = 50
+# Motori che fanno gia' l'OCR da soli: su questi non ha senso rilanciarlo.
+MOTORI_CON_OCR = {"docling"}
 EXT2CAT_RUNTIME = {
     ".pdf": "pdf", ".docx": "testo", ".doc": "testo", ".rtf": "testo", ".odt": "testo",
     ".xlsx": "foglio", ".xls": "foglio", ".ods": "foglio", ".pptx": "presentazione",
@@ -172,6 +174,72 @@ def leggi_pptx(p: Path):
 
 
 # ---------------------------------------------------------------- PDF
+def pdf_docling(p: Path):
+    """Motore preferito: Docling (IBM Research).
+
+    Riconosce il layout con modelli addestrati invece che con euristiche, il che
+    conta soprattutto sulle tabelle - un libretto delle misure o un CME sono
+    tabelle, e da li' escono i numeri che finiscono in una riserva. Include
+    l'OCR sulle pagine acquisite a scanner, quindi copre da solo il caso che
+    altrimenti resterebbe bloccante.
+
+    Il testo viene ricomposto pagina per pagina seguendo la provenienza di ogni
+    elemento, e le pagine che non producono nulla restano segmenti vuoti: senza
+    questo allineamento il controllo sul PDF misto non funzionerebbe e le
+    citazioni fonte:pagina risulterebbero sfasate.
+    """
+    try:
+        from docling.document_converter import DocumentConverter
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except BaseException as e:
+        return None, 0, f"docling non utilizzabile ({type(e).__name__})"
+
+    try:
+        doc = DocumentConverter().convert(str(p)).document
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except BaseException as e:
+        # Docling puo' fallire su PDF malformati dove i motori piu' rozzi
+        # cavano comunque qualcosa: conviene lasciar proseguire il ripiego.
+        return None, 0, f"docling: {type(e).__name__}: {e}"
+
+    try:
+        n_pagine = len(getattr(doc, "pages", {}) or {})
+        per_pagina = {}
+        for elemento, _ in doc.iterate_items():
+            pezzo = ""
+            if hasattr(elemento, "export_to_markdown"):   # tabelle
+                try:
+                    pezzo = elemento.export_to_markdown(doc)
+                except TypeError:
+                    pezzo = elemento.export_to_markdown()
+                except Exception:
+                    pezzo = ""
+            if not pezzo:
+                pezzo = getattr(elemento, "text", "") or ""
+            if not pezzo.strip():
+                continue
+            prov = getattr(elemento, "prov", None)
+            n = getattr(prov[0], "page_no", 1) if prov else 1
+            per_pagina.setdefault(n, []).append(pezzo)
+
+        if per_pagina:
+            ultima = max(max(per_pagina), n_pagine or 0)
+            pagine = ["\n".join(per_pagina.get(i, [])) for i in range(1, ultima + 1)]
+            return "\f".join(pagine), len(pagine), ""
+
+        # Nessuna provenienza utilizzabile: si rinuncia all'allineamento ma non
+        # al contenuto. Il numero di pagine dichiarato resta quello vero, cosi'
+        # il controllo sulle pagine mute continua a funzionare per conteggio.
+        testo = doc.export_to_markdown()
+        return testo, n_pagine or max(1, testo.count("\f") + 1), ""
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except BaseException as e:
+        return None, 0, f"docling, lettura del risultato: {type(e).__name__}: {e}"
+
+
 def pdf_pdftotext(p: Path):
     rc, so, se = esegui(["pdftotext", "-layout", "-enc", "UTF-8", str(p), "-"])
     if rc != 0:
@@ -368,15 +436,26 @@ def _pagine_mute(testo: str, dichiarate: int):
     return max(0, dichiarate - con_testo), []
 
 
-def leggi_pdf(p: Path, ocr_modo):
-    testo, pagine, err = pdf_pdftotext(p) if ha("pdftotext") else (None, 0, "pdftotext assente")
-    metodo_base = "pdftotext"
-    if testo is None:
-        testo, pagine, err2 = pdf_pypdf(p)
-        metodo_base, err = "pypdf", (err2 or err)
-    if testo is None:
-        testo, pagine, err3 = pdf_stdlib(p)
-        metodo_base, err = "stdlib", (err3 or err)
+def leggi_pdf(p: Path, ocr_modo, motore_scelto="auto"):
+    # I motori si provano in ordine di qualita' decrescente. Docling e' il
+    # preferito perche' e' l'unico che legge le tabelle con un modello di layout
+    # e che porta l'OCR con se'; gli altri restano come ripiego, cosi' la skill
+    # continua a funzionare su una macchina dove non e' installato nulla.
+    tentativi = []
+    if motore_scelto in ("auto", "docling"):
+        tentativi.append(("docling", pdf_docling))
+    if motore_scelto in ("auto", "classico"):
+        if ha("pdftotext"):
+            tentativi.append(("pdftotext", pdf_pdftotext))
+        tentativi += [("pypdf", pdf_pypdf), ("stdlib", pdf_stdlib)]
+
+    testo, pagine, err, metodo_base = None, 0, "nessun motore disponibile", ""
+    for nome, funzione in tentativi:
+        testo, pagine, e = funzione(p)
+        metodo_base = nome
+        if testo is not None:
+            break
+        err = e or err
     if testo is None:
         if "cifrat" in err.lower() or "encrypt" in err.lower():
             return "", 0, "PROTETTO", "", err
@@ -393,6 +472,18 @@ def leggi_pdf(p: Path, ocr_modo):
 
     def con_ocr(motivo, stato_se_fallisce):
         """Tenta l'OCR; se manca o non migliora, resta lo stato bloccante."""
+        if metodo_base in MOTORI_CON_OCR:
+            # Rilanciare l'OCR sarebbe inutile e il messaggio "installare
+            # ocrmypdf" sarebbe fuorviante: il riconoscimento ottico e' gia'
+            # avvenuto. Se il testo resta scarso il problema e' un altro - la
+            # scansione e' di cattiva qualita' - e va detto per quello che e',
+            # perche' richiede un occhio umano e non un pacchetto in piu'.
+            return (testo, pagine,
+                    "TESTO_INSUFFICIENTE" if stato_se_fallisce == "RICHIEDE_OCR"
+                    else stato_se_fallisce, metodo_base,
+                    f"{motivo}; il riconoscimento ottico di {metodo_base} e' gia' stato"
+                    " applicato: la scansione e' probabilmente illeggibile e va"
+                    " verificata a mano")
         if ocr_modo == "no":
             return testo, pagine, stato_se_fallisce, metodo_base, motivo
         t, motore, e2 = pdf_ocr(p)
@@ -536,7 +627,8 @@ def tipo_reale(p: Path, ext: str):
     return ext, ""
 
 
-def estrai_uno(v: dict, radice: Path, cartella_testi: Path, ocr_modo: str):
+def estrai_uno(v: dict, radice: Path, cartella_testi: Path, ocr_modo: str,
+               motore: str = "auto"):
     p = radice / v["percorso"]
     cat, ext = v["categoria"], v["ext"]
     testo, pagine, stato, metodo, nota = "", 0, "ERRORE", "", ""
@@ -544,7 +636,6 @@ def estrai_uno(v: dict, radice: Path, cartella_testi: Path, ocr_modo: str):
     if avviso:
         ext = ext_reale
         cat = EXT2CAT_RUNTIME.get(ext, cat)
-        nota = avviso
     try:
         if cat in ("immagine", "cad", "archivio"):
             stato, nota = "NON_TESTUALE", "nessun testo da estrarre per natura del file"
@@ -554,7 +645,7 @@ def estrai_uno(v: dict, radice: Path, cartella_testi: Path, ocr_modo: str):
                     testo, stato, metodo = so.decode("utf-8", "replace"), "OCR_OK", "tesseract"
                     nota = ""
         elif ext == ".pdf":
-            testo, pagine, stato, metodo, nota = leggi_pdf(p, ocr_modo)
+            testo, pagine, stato, metodo, nota = leggi_pdf(p, ocr_modo, motore)
         elif ext in (".docx",):
             testo, pagine = leggi_docx(p); stato, metodo = "OK", "ooxml"
         elif ext in (".xlsx", ".xlsm", ".xltx"):
@@ -627,7 +718,11 @@ def estrai_uno(v: dict, radice: Path, cartella_testi: Path, ocr_modo: str):
                         f"### metodo={metodo} pagine={pagine} caratteri={len(testo)}\n\n")
         dest.write_text(intestazione + testo, encoding="utf-8")
         v["testo"] = str(dest.name)
-    note = [x for x in (v.get("nota") or "", nota) if x]
+    # La nota viene riscritta da zero a ogni estrazione, non accodata a quella
+    # precedente: un rilancio serve a produrre una diagnosi aggiornata, e una
+    # nota stratificata finirebbe per contenere consigli ormai sbagliati -
+    # per esempio "installare ocrmypdf" accanto a un file poi letto da Docling.
+    note = [x for x in (avviso, nota) if x]
     v.update(estrazione=stato, metodo=metodo, caratteri=len(testo.strip()),
              pagine=pagine, nota="; ".join(dict.fromkeys(note)))
     return v
@@ -638,6 +733,8 @@ def main():
     ap.add_argument("inventario", help="cartella _inventario (o la radice della commessa)")
     ap.add_argument("--ocr", choices=["auto", "no"], default="auto",
                     help="auto = usa l'OCR sulle scansioni se disponibile (default)")
+    ap.add_argument("--motore", choices=["auto", "docling", "classico"], default="auto",
+                    help="auto = usa Docling se installato, altrimenti i motori classici")
     ap.add_argument("--jobs", type=int, default=max(2, (os.cpu_count() or 4) // 2))
     ap.add_argument("--solo-mancanti", action="store_true",
                     help="rilavora solo i file non ancora completati")
@@ -666,10 +763,23 @@ def main():
             visti[v["sha256"]] = v["id"]
         lavoro.append(v)
 
-    print(f"Estrazione di {len(lavoro)} file (OCR: {a.ocr})...")
+    disponibile = "no"
+    if a.motore in ("auto", "docling"):
+        try:
+            import docling  # noqa: F401
+            disponibile = "si"
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except BaseException:
+            disponibile = "no"
+    print(f"Estrazione di {len(lavoro)} file (OCR: {a.ocr}, motore: {a.motore}, "
+          f"Docling installato: {disponibile})...")
+    if a.motore == "auto" and disponibile == "no":
+        print("  Nota: senza Docling i PDF vengono letti con i motori classici,")
+        print("        meno accurati sulle tabelle. Vedi references/formati.md.")
     fatti = 0
     with ThreadPoolExecutor(max_workers=a.jobs) as ex:
-        for v in ex.map(lambda x: estrai_uno(x, radice, testi, a.ocr), lavoro):
+        for v in ex.map(lambda x: estrai_uno(x, radice, testi, a.ocr, a.motore), lavoro):
             fatti += 1
             if fatti % 10 == 0 or fatti == len(lavoro):
                 print(f"  {fatti}/{len(lavoro)}", flush=True)
