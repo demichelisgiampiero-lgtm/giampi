@@ -39,10 +39,17 @@ Verifica anche i motori di estrazione e OCR:
 for p in pdftotext ocrmypdf tesseract; do command -v $p >/dev/null && echo "OK $p" || echo "-- $p mancante"; done
 python3 -c "import pdfplumber, openpyxl, docx" 2>&1
 ```
-Attenzione a un tranello: quando a `commessa-rag` mancano le sue librerie,
-marca `needs_ocr` **anche i PDF perfettamente nativi**. Manderesti l'utente a
-riprendere a mano documenti che non hanno alcun problema di scansione. Se quel
-controllo fallisce, il problema e' una libreria, non l'OCR: dillo cosi'.
+Attenzione al significato di `needs_ocr`: vuol dire **«non ho ricavato testo»**,
+non «e' una scansione». Ci finisce dentro anche un PDF nativo che il suo
+estrattore non e' riuscito ad aprire — una tabella `xref` danneggiata basta — e
+mandarlo all'OCR sarebbe il rimedio sbagliato: si rasterizzerebbe una pagina
+per riconoscere da capo parole che ci sono gia', perdendo accuratezza.
+
+La fase 1 distingue i due casi perche' legge i PDF con un metodo diverso, che
+ignora la struttura di indicizzazione del file. Quando un documento risulta
+`needs_ocr` per `commessa-rag` ma la fase 1 ne ha estratto il testo, il problema
+e' il file danneggiato, non la scansione: va riparato (per esempio con
+`qpdf --qdf --object-streams=disable`) e reindicizzato, non passato all'OCR.
 
 ## Fase 1 — Acquisizione → **Cancello 1: integrita'**
 
