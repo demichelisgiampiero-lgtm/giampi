@@ -1,0 +1,8 @@
+{
+  "name": "commessa-forense",
+  "displayName": "Commessa forense",
+  "version": "0.1.0",
+  "description": "Analisi documentale esaustiva e verificabile di una commessa di appalto: censimento, integrita' dei PDF pagina per pagina con OCR a monte, lettura registrata di ogni atto e tre cancelli che impediscono di consegnare un'analisi incompleta o non fondata. Orchestra le skill commessa-rag, cme-claims e cme-plugin senza sostituirle.",
+  "keywords": ["appalti", "commessa", "riserve", "claims", "contabilita-lavori", "ocr", "rag"],
+  "author": { "name": "Giampiero De Michelis" }
+}
