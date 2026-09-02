@@ -67,7 +67,8 @@ Per continuare lo sviluppo: leggi prima questo file, poi `WORKFLOW.md`.
 quando si è deciso di orchestrare `commessa-rag` invece di duplicarlo.
 
 Attenzione però: **contiene ancora qualcosa che il plugin non ha.** Il suo
-`scripts/estrai.py` (798 righe) ha l'integrazione con **Docling** e i lettori
+`.claude/skills/inventario-documenti/scripts/estrai.py` (798 righe) ha
+l'integrazione con **Docling** e i lettori
 per `.docx`/`.xlsx`/`.eml` in libreria standard. Il plugin cerca Docling nella
 ricognizione ma **nessuno script del plugin lo usa**: il lavoro su Docling è di
 fatto orfano.
