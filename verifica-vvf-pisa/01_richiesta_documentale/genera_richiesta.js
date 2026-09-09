@@ -85,6 +85,7 @@ function tabellaRichieste(rows) {
     ],
   });
   const body = rows.map((r, i) => new TableRow({
+    cantSplit: true,
     children: [
       cell(txt(r[0], { bold: true, align: AlignmentType.CENTER }), { w: C[0], fill: i % 2 ? ZEBRA : undefined }),
       cell(txt(r[1], { bold: true }), { w: C[1], fill: i % 2 ? ZEBRA : undefined }),
@@ -113,7 +114,7 @@ function box(paragraphs, fill = SOFT) {
       insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "auto" },
       insideVertical:   { style: BorderStyle.NONE, size: 0, color: "auto" },
     },
-    rows: [new TableRow({ children: [cell(paragraphs, { w: CONTENT, fill })] })],
+    rows: [new TableRow({ cantSplit: true, children: [cell(paragraphs, { w: CONTENT, fill })] })],
   });
 }
 
@@ -141,6 +142,38 @@ const tabellaDati = new Table({
       cell(txt(v), { w: H[1], fill: i % 2 ? ZEBRA : undefined }),
     ],
   })),
+});
+
+/* ---------- stato di trasmissione degli atti ---------- */
+const S = [3500, 1500, 4638];
+const statoAtti = [
+  ["Ordine di Servizio n. 20", "GIÀ INVIATO", "Trasmesso il 09/09/2026. Non più correggibile: gli errori che contiene sono nelle mani della controparte e possono essere superati solo con un atto rettificativo, da adottare prima del sopralluogo del 18/09."],
+  ["Lettera di contestazione dello stato dei lavori", "GIÀ INVIATA", "Trasmessa il 09/09/2026, con assegnazione di 48 ore per il riscontro (scadenza 11/09/2026). Vale quanto sopra."],
+  ["Relazione di grave inadempimento e proposta di risoluzione", "NON INVIATA", "Ancora modificabile. È l'atto su cui si regge l'intera procedura di risoluzione ed è quello su cui va concentrata la correzione."],
+  ["Relazione Fotografica (69 fotografie)", "NON INVIATA", "Allegato A della Relazione. Ancora modificabile."],
+];
+const tabellaStato = new Table({
+  width: { size: CONTENT, type: WidthType.DXA },
+  columnWidths: S,
+  borders: tblBorders,
+  rows: [
+    new TableRow({
+      tableHeader: true,
+      children: [
+        cell(txt("Atto", { bold: true, color: "FFFFFF" }), { w: S[0], fill: HEADFILL }),
+        cell(txt("Stato", { bold: true, color: "FFFFFF", align: AlignmentType.CENTER }), { w: S[1], fill: HEADFILL }),
+        cell(txt("Conseguenza", { bold: true, color: "FFFFFF" }), { w: S[2], fill: HEADFILL }),
+      ],
+    }),
+    ...statoAtti.map(([a, s, c]) => new TableRow({
+      cantSplit: true,
+      children: [
+        cell(txt(a, { bold: true }), { w: S[0] }),
+        cell(txt(s, { bold: true, align: AlignmentType.CENTER }), { w: S[1], fill: s.includes("GIÀ") ? "FDECEC" : "E9F3EA" }),
+        cell(txt(c, { color: GREY }), { w: S[2] }),
+      ],
+    })),
+  ],
 });
 
 /* ---------- contenuti ---------- */
@@ -293,17 +326,10 @@ const doc = new Document({
 
       /* premessa */
       H1("1.  PREMESSA E OGGETTO DELLA RICHIESTA"),
-      Prich([
-        { t: "È stata condotta la verifica di coerenza formale, documentale e procedurale sui seguenti atti: " },
-        { t: "Relazione di grave inadempimento contrattuale e proposta di risoluzione", b: true },
-        { t: " (09/09/2026), " },
-        { t: "Ordine di Servizio n. 20", b: true },
-        { t: " (09/09/2026), " },
-        { t: "lettera di contestazione formale dello stato dei lavori", b: true },
-        { t: " (09/09/2026) e " },
-        { t: "Relazione Fotografica", b: true },
-        { t: " (69 fotografie)." },
-      ], { after: 160 }),
+      P("È stata condotta la verifica di coerenza formale, documentale e procedurale sui quattro atti della commessa, che si trovano però in due condizioni diverse e non vanno trattati allo stesso modo.", { after: 160 }),
+
+      tabellaStato,
+      P("", { after: 200 }),
       P("La verifica ha accertato che il fascicolo, nella sua composizione attuale, non è ancora completo rispetto ai requisiti di contenuto posti dall'art. 108, co. 3, D.Lgs. 50/2016 e presenta incongruenze interne che sarebbero utilizzabili dall'Impresa in sede di controdeduzioni, davanti al giudice e in sede ANAC.", { after: 160 }),
       P("Con la presente si richiedono pertanto i documenti e i chiarimenti elencati nelle sezioni che seguono. Ciascuna voce riporta la finalità e il rilievo cui si collega, così da rendere immediatamente valutabile che cosa comporti la mancata acquisizione.", { after: 200 }),
 
@@ -349,7 +375,7 @@ const doc = new Document({
       P("", { after: 240 }),
 
       H1("7.  CHIARIMENTI RICHIESTI ALLA DIREZIONE LAVORI"),
-      P("Le voci che seguono non richiedono la produzione di un documento ma una presa di posizione della DL, necessaria per correggere i testi prima dell'invio.", { after: 160, color: GREY, italics: true }),
+      P("Le voci che seguono non richiedono la produzione di un documento ma una presa di posizione della DL. Per la Relazione servono a correggerla prima dell'invio; per l'OdS n. 20 e la lettera, già trasmessi, servono a definire il contenuto dell'atto rettificativo da adottare prima del sopralluogo del 18/09.", { after: 160, color: GREY, italics: true }),
       tabellaRichieste(sez6),
       P("", { after: 260 }),
 
@@ -358,11 +384,14 @@ const doc = new Document({
       box([
         ...txt("Il fascicolo contiene una contraddizione che va sciolta prima di ogni altra cosa.", { bold: true, size: 20 }),
         new Paragraph({ spacing: { before: 140, after: 100 }, children: [new TextRun({
-          text: "L'Ordine di Servizio n. 20, emesso il 09/09/2026, convoca il sopralluogo in contraddittorio per venerdì 18 settembre 2026; la lettera di pari data assegna 48 ore per il riscontro. La Relazione, anch'essa datata 09/09/2026, classifica però lo stesso OdS n. 20 come «Inadempiente – nessun riscontro» e propone la risoluzione del contratto.",
+          text: "L'Ordine di Servizio n. 20, già trasmesso il 09/09/2026, convoca il sopralluogo in contraddittorio per venerdì 18 settembre 2026; la lettera di pari data, anch'essa già trasmessa, assegna 48 ore per il riscontro. La Relazione non ancora inviata classifica però lo stesso OdS n. 20 come «Inadempiente – nessun riscontro» e su quella base propone la risoluzione del contratto.",
           size: 19, font: "Calibri" })] }),
-        new Paragraph({ spacing: { before: 0, after: 0 }, children: [new TextRun({
-          text: "Se i tre atti vengono trasmessi insieme, l'Impresa eccepirà che la risoluzione è stata proposta prima della scadenza del termine assegnato dalla Direzione Lavori stessa. La sequenza degli atti va quindi definita contestualmente alla raccolta della documentazione qui richiesta.",
+        new Paragraph({ spacing: { before: 0, after: 100 }, children: [new TextRun({
+          text: "Poiché i due atti che fissano i termini sono già usciti, quei termini sono ormai opponibili alla Direzione Lavori. Se la Relazione viene trasmessa prima che siano scaduti, l'Impresa eccepirà che la risoluzione è stata proposta prima della scadenza del termine assegnato dalla DL stessa.",
           size: 19, bold: true, font: "Calibri" })] }),
+        new Paragraph({ spacing: { before: 0, after: 0 }, children: [new TextRun({
+          text: "Ne discendono due conseguenze operative: (i) la Relazione non va trasmessa finché il contraddittorio del 18/09 non si è svolto e non ne è stato redatto verbale; (ii) sui punti dell'OdS n. 20 che allo stato sono ineseguibili — in primo luogo la prescrizione 2.2, che non corrisponde alla non conformità contestata, e l'elemento indicato come «brindosbarra» — occorre un atto rettificativo prima del sopralluogo, perché una prescrizione ineseguibile non è opponibile e il suo mancato adempimento non è contestabile.",
+          size: 19, font: "Calibri" })] }),
       ], "FDECEC"),
       P("", { after: 260 }),
 
