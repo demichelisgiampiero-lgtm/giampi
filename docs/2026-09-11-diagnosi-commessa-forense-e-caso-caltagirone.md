@@ -201,7 +201,7 @@ Ordinato per rapporto fra beneficio e sforzo. Nessuno di questi e' un plugin nuo
 
 | # | Intervento | Chiude | Sforzo |
 |---|---|---|---|
-| **1** | ✅ **DECISO** — **Copertura in pagine oltre che in atti.** `781/781` diventa anche `3.155/16.402`, con l'elenco delle pagine saltate e la motivazione dichiarata. **Specifica al §6-bis** | §3.1 | medio |
+| ~~1~~ | ❌ **GIA' IMPLEMENTATO IN SORGENTE — v. §6-quater.** ~~Copertura in pagine oltre che in atti.~~ `781/781` diventa anche `3.155/16.402`, con l'elenco delle pagine saltate e la motivazione dichiarata. **Specifica al §6-bis** | §3.1 | medio |
 | **2** | **`parziali_confronto.py` dentro il cancello di copertura.** Ogni «gia' letto» verificato dalla macchina, subito, non a mano a fine lavoro | §3.2 | basso — lo script esiste |
 | **3** | **`indicizza2.py` come criterio di fine indicizzazione**, per cartella di primo livello. Mai «nessun documento nuovo» | §3.3 | basso — lo script esiste |
 | **4** | **Divieto di `--max-seconds`** scritto nel `SKILL.md`, con la ragione | §3.3 | minimo |
@@ -221,6 +221,11 @@ misura in pagine, il 100% di oggi diventa onestamente un 19%**. Non e' un peggio
 lavoro — e' la fine di un dato che rassicurava senza fondamento.
 
 **Deciso l'11/09/2026: si procede.** Specifica al §6-bis.
+
+> ⚠️ **Superato lo stesso giorno.** La lettura del codice sorgente ha mostrato che la
+> copertura in pagine **e' gia' implementata** dal 7 settembre, in forma piu' completa della
+> specifica. **Leggere il §6-quater**: il §6-bis resta solo come documentazione di cosa si
+> era chiesto, non come lavoro da fare.
 
 ---
 
@@ -361,6 +366,73 @@ E' questo che genera i disallineamenti che l'audit del 05-09 rincorreva a mano. 
 
 Ogni modifica al codice — a partire dall'intervento 1 — va seguita da un **ricaricamento
 esplicito**, altrimenti non entra in esercizio.
+
+---
+
+## 6-quater. CORREZIONE — l'intervento 1 e' gia' implementato in sorgente
+
+Letto `copertura.py` della copia viva (105.602 byte, 7 settembre; confermata dall'utente come
+quella sul PC). **La copertura in pagine c'e' gia', ed e' piu' completa della specifica del
+§6-bis.**
+
+### Cosa fa gia' `cmd_stato`
+
+```
+COPERTURA DI LETTURA: 781/781 = 100.0%  (documenti)
+COPERTURA IN PAGINE : 3155/16402 = 19.2%  <- quanto fascicolo e' stato guardato
+  Le due misure rispondono a domande diverse: la prima dice quanti
+  atti sono stati aperti, la seconda quanta carta e' stata letta.
+```
+
+| Funzione | Riga | Cosa fa |
+|---|---|---|
+| `conta_pagine()` | 701 | interpreta `"1-5,32,40"`; `-1` se la dicitura non si legge |
+| `copertura_in_pagine()` | 730 | somma le pagine; restituisce anche gli atti **senza dichiarazione** |
+| `pagine_da_indice()` | 767 | prende `{percorso: n_pagine}` dall'indice di `commessa-rag` |
+| `cmd_parziale` | 1535 | **`--pagine` obbligatorio**, con validazione del formato |
+| `cmd_pagine` | 1556 | dichiarazione **retroattiva** per i fascicoli lavorati prima dell'obbligo |
+
+Piu': il marcatore **`(MINIMO)`** quando qualche parziale non dichiara le pagine (*«e' un rilievo
+e non uno zero»*), il blocco **BLOCCANTE** sulle parziali senza pagine, e la gestione delle buste
+`.p7m` nel denominatore (*«misurato il 6 settembre 2026 su Bottegone»*).
+
+### Il §3.1 di questo documento era sbagliato nella premessa
+
+Il `781/781` non nascondeva nulla: lo strumento stampava gia' entrambe le misure, e l'HANDOFF le
+citava entrambe. La riga dell'HANDOFF e' stata letta come se fosse l'esito del cancello, e non lo
+era. **Nessuna patch da scrivere sulla copertura in pagine.**
+
+Resta valido il §3.1 come descrizione del fenomeno (100% di atti != 100% di carta); cade la parte
+che lo dava per non implementato.
+
+### Cio' che invece NON e' implementato — ed e' il difetto che ha prodotto il danno
+
+Su `cmd_parziale`, **`--motivo` e' obbligatorio ma non viene mai verificato**. Ricerca su tutto
+`copertura.py`: nessun controllo sul contenuto del motivo, nessun richiamo a un confronto di testo.
+
+Quindi questa registrazione passa senza rilievi:
+
+```
+--motivo "riproduce il parere 627, gia' letto"  --pagine "1-8,34-39"
+```
+
+Le pagine dichiarate entrano nel conteggio, il cancello e' soddisfatto, e **le 21 pagine del
+D.D.G. 3 contenenti i pareri CTS 350/2023 e 526/2023 restano fuori senza che nulla lo segnali.**
+
+**Il difetto §3.2 e' l'unico dei quattro rimasto intatto, ed e' quello che e' costato caro su
+Caltagirone.** Lo strumento che lo chiuderebbe, `parziali_confronto.py`, e' ancora nello
+scratchpad (§5).
+
+### Piano rivisto
+
+| Ordine | Intervento | Stato |
+|---|---|---|
+| 1 | Verificare quale versione e' **in esercizio** (caricamento del 5 vs sorgente del 7) e, se serve, ricaricare | da fare, costo nullo |
+| 2 | **`--motivo` tipizzato e verificato**: causa `RIPRODUCE` → esegue `parziali_confronto.py`; se il confronto non regge, l'atto torna da leggere | **il vero intervento** |
+| 3 | Ramo di lettura dell'inventario nei quattro plugin consumatori (§2) | la richiesta originaria |
+| 4 | Plugin nel repository, script fuori dallo scratchpad | §6-ter.2 |
+
+~~Intervento 1 del §6~~ — **gia' implementato, cancellato dal piano.**
 
 ---
 
