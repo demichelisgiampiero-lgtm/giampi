@@ -369,6 +369,7 @@ def rassegna(cartella):
         S = json.loads(reg.read_text(encoding="utf-8"))
     except (OSError, ValueError) as err:
         return None, f"registro non leggibile: {err}"
+    byid = {v.get("id"): v for v in S.get("file", [])}
     fuori = []
     for v in S.get("file", []):
         if v.get("lettura") != "PARZIALE":
@@ -378,8 +379,36 @@ def rassegna(cartella):
             continue
         if v.get("riproduce"):
             continue          # dichiarata e verificata al momento della registrazione
+        v = dict(v)
+        v["_rimandi"] = _rimandi_della_nota(nota, byid)
         fuori.append(v)
     return fuori, ""
+
+
+def _rimandi_della_nota(nota, byid):
+    """I rimandi «id NNN» scritti dentro una motivazione, risolti sul registro.
+
+    Un id scritto in prosa e' un riferimento PENDENTE: nulla lo tiene valido, e
+    un ricensimento rinumera i documenti senza toccare le note. Misurato l'11
+    settembre 2026 su Caltagirone: cinque relazioni di calcolo elettrico
+    (POD2..POD6) rimandavano a «POD1 (id 678)», ma l'id 678 dopo il ricensimento
+    era la Relazione Tecnico Agronomica. Gli id erano slittati di +9 - POD1 era
+    diventato il 687 - e tutti e cinque i rimandi erano silenziosamente sbagliati.
+
+    E' anche la ragione per cui `--riproduce` prende un PERCORSO e non un id:
+    un percorso sopravvive a un ricensimento, un id no.
+    """
+    fuori = []
+    for m in re.finditer(r"\bid\.?\s*(\d{1,5})\b", nota, re.I):
+        n = int(m.group(1))
+        d = byid.get(n)
+        fuori.append({
+            "id": n,
+            "nome": d.get("nome") if d else None,
+            "lettura": d.get("lettura") if d else None,
+            "pagine_lette": (d.get("pagine_lette") or "") if d else "",
+        })
+    return fuori
 
 
 # --------------------------------------------------------------------------- #
@@ -412,10 +441,27 @@ def main(argv=None):
             return 0
         print(f"{len(sospette)} letture parziali AFFERMANO una riproduzione mai verificata:")
         print()
+        catene = 0
         for v in sospette:
             print(f"  #{v.get('id')} {v.get('percorso')}")
             print(f"      pagine lette: {v.get('pagine_lette') or '(non dichiarate)'}")
             print(f"      motivo      : {(v.get('nota') or '').strip()}")
+            for r in v.get("_rimandi") or []:
+                if r["nome"] is None:
+                    print(f"      !! rimanda a id {r['id']}, che nel registro NON ESISTE")
+                    continue
+                print(f"      rimanda a id {r['id']} -> {r['nome']}  [{r['lettura']}]")
+                if r["lettura"] == "PARZIALE":
+                    catene += 1
+                    print(f"         !! CATENA: anche quello e' letto in parte "
+                          f"(pagine {r['pagine_lette'] or 'non dichiarate'}). "
+                          f"L'affermazione poggia su un atto a sua volta non letto.")
+        if catene:
+            print()
+            print(f"  {catene} rimandi puntano a un atto a sua volta letto solo in parte.")
+            print("  Un id scritto in prosa e' un riferimento pendente: un ricensimento")
+            print("  rinumera i documenti e le note restano indietro. Verificare a mano")
+            print("  che l'id citato sia ancora quello inteso.")
         print()
         print("  Ciascuna sostiene che il resto dell'atto sta in un altro documento,")
         print("  e nessuno l'ha controllato. Per verificarne una:")

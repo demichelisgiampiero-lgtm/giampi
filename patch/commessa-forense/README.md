@@ -201,3 +201,51 @@ Il primo elenco di spie era stato costruito su un solo caso reale. Su 175 motiva
 intercettava **zero**. Non è un difetto di soglia: è che l'idioma di un fascicolo non si indovina
 a tavolino. Le spie nuove sono state ricavate dalle motivazioni effettive, contate una per una, e
 riprovate contro dieci letture mirate legittime senza produrre falsi positivi.
+
+---
+
+## Secondo esito: i rimandi `id NNN` nelle note sono riferimenti pendenti
+
+Preparando i comandi di verifica per le cinque relazioni `IT-CAL-00-EL-02`, è emerso che
+**l'`id 678` citato nelle motivazioni non è POD1.**
+
+```
+#688 … «struttura standard già riscontrata su POD1 (id 678)»
+     rimanda a id 678 -> IT-CAL-00-AMB-82- Relazione Tecnico Agronomica.pdf  [LETTO]
+```
+
+Non è un refuso. **Gli id sono slittati di esattamente +9**, verificato su tutti e cinque i
+rimandi e su nessun altro scarto (0/5 a +0, +1, +5, +8, +10; **5/5 a +9**). POD1 aveva id 678
+quando le note furono scritte, e dopo un ricensimento è diventato **#687**.
+
+**Un id scritto in prosa dentro una nota è un riferimento pendente:** nulla lo tiene valido, e un
+ricensimento rinumera i documenti senza toccare le motivazioni.
+
+È anche la conferma, per via accidentale, che `--riproduce` fa bene a prendere un **percorso** e
+non un id: un percorso sopravvive a un ricensimento.
+
+### La catena vera
+
+| | pagine | lette |
+|---|---|---|
+| **#687 POD1** (il riferimento reale) | 231 | **1-10** — *anch'esso letto in parte* |
+| #688 POD2 | 248 | 1 |
+| #689 POD3 | 563 | 1 |
+| #690 POD4 | 237 | 1 |
+| #691 POD5 | 231 | 1 |
+| #692 POD6 | 584 | 1 |
+
+POD2–POD6 lasciano fuori **1.858 pagine** appoggiandosi a POD1, che a sua volta ne ha **221 non
+lette su 231**.
+
+**L'intera catena poggia su 10 pagine effettivamente lette.**
+
+E qui c'è un limite che il confronto non supera: può provare che POD2…POD6 sono copie di POD1, ma
+**riprodurre giustifica il non rileggere, non il non leggere**. Se sono identiche, restano 231
+pagine che nessuno ha aperto — solo, una volta sola invece di sei.
+
+### Aggiunta al modulo
+
+La rassegna ora risolve i rimandi `id NNN` trovati nelle note e mostra a cosa puntano davvero,
+segnalando in particolare quando il bersaglio è **a sua volta una lettura parziale** (catena) o
+quando l'id **non esiste** nel registro.
