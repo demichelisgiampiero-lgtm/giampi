@@ -1,5 +1,5 @@
 --- /tmp/claude-0/-home-user-giampi/d49a98bc-1733-59b2-9ee7-601bf75656ef/scratchpad/copertura.orig.py	2026-09-11 16:29:11.544039759 +0000
-+++ patch/commessa-forense/copertura.py.patched	2026-09-11 16:46:02.334531772 +0000
++++ patch/commessa-forense/copertura.py.patched	2026-09-11 17:03:48.580210791 +0000
 @@ -15,6 +15,7 @@
  file che il motore ha saltato in silenzio.
  """
@@ -8,7 +8,7 @@
  from contextlib import contextmanager
  from datetime import datetime
  from pathlib import Path
-@@ -1532,23 +1533,131 @@
+@@ -1532,49 +1533,217 @@
      return 1 if errori else 0
  
  
@@ -148,7 +148,106 @@
      print(f"  ({radice})")
      return 0
  
-@@ -1988,6 +2097,15 @@
+ 
+ def cmd_pagine(a):
+-    """Dichiara a posteriori quali pagine sono state lette, senza riscrivere la scheda.
++    """Dichiara a posteriori pagine e causa di una lettura parziale, senza toccare la scheda.
+ 
+     Serve per i fascicoli lavorati prima che la dichiarazione fosse obbligatoria: la
+     scheda c'e' ed e' buona, manca solo il dato che rende sommabile la lettura.
++
++    Da qui si dichiara anche la CAUSA, e con `--causa RIPRODUCE` il confronto viene
++    eseguito esattamente come in `parziale`. La differenza e' che qui `--sintesi` e
++    `--motivo` non si toccano: una motivazione gia' scritta bene non va riscritta solo
++    per poterla provare. Misurato l'11 settembre 2026 su Caltagirone, dove cinque
++    relazioni di calcolo avevano schede buone e affermazioni non verificate: senza
++    questa via, provarle avrebbe richiesto di ribattere cinque sintesi a mano, con
++    l'unico risultato probabile di peggiorarle.
+     """
+-    quante = conta_pagine(a.pagine)
+-    if quante < 0:
++    causa = (getattr(a, "causa", None) or "").strip().upper()
++    if causa and causa not in ("MIRATA", "RIPRODUCE", "ILLEGGIBILE"):
++        sys.exit(f"ERRORE: --causa \"{a.causa}\" non ammessa. "
++                 f"Ammesse: MIRATA, RIPRODUCE, ILLEGGIBILE.")
++    riferimenti = list(getattr(a, "riproduce", None) or [])
++    if causa == "RIPRODUCE" and not riferimenti:
++        sys.exit("ERRORE: --causa RIPRODUCE richiede --riproduce \"<percorso dell'atto "
++                 "gia' letto>\": senza, non c'e' nulla con cui confrontare.")
++    if riferimenti and causa != "RIPRODUCE":
++        sys.exit("ERRORE: --riproduce ha senso solo con --causa RIPRODUCE.")
++    if not a.pagine and not causa:
++        sys.exit("ERRORE: serve almeno --pagine o --causa.")
++    if a.pagine and conta_pagine(a.pagine) < 0:
+         sys.exit(f"ERRORE: --pagine \"{a.pagine}\" non si legge. Attese pagine e "
+                  f"intervalli separati da virgola: \"1-5,32,40\".")
++
++    # Come in `parziale`: il rifiuto si annota e si esce DOPO il lock, cosi' il
++    # registro non viene toccato da una dichiarazione che non si fara'.
++    rifiuto = None
++    nome = spec = None
+     with stato_esclusivo(a.cartella) as (f, S):
+-        for v in S["file"]:
+-            if v["id"] == a.id:
+-                if v.get("lettura") != "PARZIALE":
+-                    sys.exit(f"#{a.id} non e' una lettura parziale: e' {v.get('lettura')}. "
+-                             f"Le pagine si dichiarano sulle letture parziali.")
+-                v["pagine_lette"] = a.pagine
+-                nome = v["percorso"]
+-                break
++        radice = S["radice"]
++        v = next((x for x in S["file"] if x["id"] == a.id), None)
++        if v is None:
++            rifiuto = f"id #{a.id} inesistente"
++        elif v.get("lettura") != "PARZIALE":
++            rifiuto = (f"#{a.id} non e' una lettura parziale: e' {v.get('lettura')}. "
++                       f"Le pagine si dichiarano sulle letture parziali.")
+         else:
+-            sys.exit(f"id #{a.id} inesistente")
+-    print(f"#{a.id} {nome}: dichiarate {quante} pagine ({a.pagine}).")
++            nome = v["percorso"]
++            spec = a.pagine or v.get("pagine_lette") or ""
++            if causa == "RIPRODUCE":
++                if not spec:
++                    rifiuto = (f"#{a.id} non dichiara quali pagine sono state lette: "
++                               f"senza, non si sa quali confrontare. Aggiungere --pagine.")
++                else:
++                    try:
++                        import parziali_confronto
++                    except ImportError:
++                        rifiuto = ("ERRORE: parziali_confronto.py non e' accanto a "
++                                   "copertura.py.\n  Senza il confronto, la riproduzione "
++                                   "resterebbe un'affermazione non verificata: non si "
++                                   "dichiara.\n  Un verificatore mancante non e' un "
++                                   "lasciapassare.")
++                    else:
++                        esito = parziali_confronto.confronta(
++                            Path(radice), nome, spec, riferimenti)
++                        if not esito["regge"]:
++                            rifiuto = parziali_confronto.spiega(
++                                esito, nome, ", ".join(riferimenti))
++            if rifiuto is None:
++                if a.pagine:
++                    v["pagine_lette"] = a.pagine
++                if causa:
++                    v["causa_parziale"] = causa
++                    if causa == "RIPRODUCE":
++                        v["riproduce"] = riferimenti
++                    else:
++                        v.pop("riproduce", None)
++    if rifiuto:
++        sys.exit(rifiuto)
++    if a.pagine:
++        print(f"#{a.id} {nome}: dichiarate {conta_pagine(a.pagine)} pagine ({a.pagine}).")
++    if causa == "RIPRODUCE":
++        print(f"#{a.id} {nome}: riproduzione PROVATA sulle pagine non lette.")
++        print(f"  riferimento: {', '.join(riferimenti)}")
++    elif causa:
++        print(f"#{a.id} {nome}: causa dichiarata {causa}.")
+     return 0
+ 
+ 
+@@ -1988,11 +2157,29 @@
      p.add_argument("--pagine", required=True,
                     help="quali pagine sono state lette: \"1-5,32,40\", oppure "
                          "\"non-paginato\" per fogli di calcolo ed e-mail")
@@ -163,4 +262,20 @@
 +                   help="l'atto gia' letto di cui questo sarebbe copia (ripetibile)")
      p.set_defaults(f=cmd_parziale)
      p = sub.add_parser("pagine",
-                        help="dichiara quali pagine ha letto una lettura parziale gia' registrata")
+-                       help="dichiara quali pagine ha letto una lettura parziale gia' registrata")
++                       help="dichiara pagine e causa di una lettura parziale gia' registrata, "
++                            "senza riscriverne la scheda")
+     p.add_argument("cartella"); p.add_argument("id", type=int)
+-    p.add_argument("--pagine", required=True); p.set_defaults(f=cmd_pagine)
++    p.add_argument("--pagine", help='quali pagine sono state lette: "1-5,32,40". '
++                                    "Se omesso, resta quello gia' registrato")
++    p.add_argument("--causa", choices=["MIRATA", "RIPRODUCE", "ILLEGGIBILE"],
++                   help="dichiara perche' il resto non e' stato letto. Con RIPRODUCE "
++                        "il confronto viene eseguito e la dichiarazione e' rifiutata se "
++                        "una sola pagina non si ritrova nel riferimento")
++    p.add_argument("--riproduce", action="append", metavar="PERCORSO",
++                   help="l'atto gia' letto di cui questo sarebbe copia (ripetibile)")
++    p.set_defaults(f=cmd_pagine)
+     p = sub.add_parser("aperti"); p.add_argument("cartella"); p.set_defaults(f=cmd_aperti)
+     p = sub.add_parser("escludi"); p.add_argument("cartella"); p.add_argument("id", type=int, nargs="+")
+     p.add_argument("--motivo", required=True); p.set_defaults(f=cmd_escludi)

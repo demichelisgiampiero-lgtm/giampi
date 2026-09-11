@@ -249,3 +249,57 @@ pagine che nessuno ha aperto — solo, una volta sola invece di sei.
 La rassegna ora risolve i rimandi `id NNN` trovati nelle note e mostra a cosa puntano davvero,
 segnalando in particolare quando il bersaglio è **a sua volta una lettura parziale** (catena) o
 quando l'id **non esiste** nel registro.
+
+---
+
+## Estensione di `copertura.py pagine` (11 settembre 2026, sera)
+
+Dopo che il confronto su POD6 ha dato esito positivo, serviva poter **registrare come provata**
+una riproduzione già affermata, senza riscrivere la scheda.
+
+Rilanciare `parziale` non andava bene: riscrive anche `--sintesi` e `--motivo`, quindi per provare
+cinque relazioni si sarebbero dovute ribattere a mano cinque sintesi già buone, con l'unico
+risultato probabile di peggiorarle.
+
+`pagine` esisteva già *«per i fascicoli lavorati prima che la dichiarazione fosse obbligatoria»*.
+È lo stesso scopo, quindi l'estensione va lì.
+
+### Cosa accetta ora
+
+```bash
+python3 scripts/copertura.py pagine "<cartella>" <id> \
+    --causa RIPRODUCE --riproduce "<percorso dell'atto già letto>"
+```
+
+- **`--pagine` è diventato opzionale**: se omesso resta quello già registrato;
+- **`--causa {MIRATA,RIPRODUCE,ILLEGGIBILE}`** dichiara perché il resto non è stato letto;
+- **`--riproduce`** indica l'atto di riferimento, ed **esegue il confronto**;
+- **`--sintesi` e `--motivo` non si toccano.**
+
+Se il confronto non regge, la dichiarazione è **rifiutata e il registro non viene scritto**.
+
+### Campi scritti
+
+`causa_parziale` e, per `RIPRODUCE`, `riproduce`. Da quel momento la rassegna **smette di
+segnalare** quella voce: non è più un'affermazione, è un fatto provato.
+
+### Prove eseguite
+
+Laboratorio con indice SQLite e registro reali, tre atti:
+
+| Prova | Atteso | Esito |
+|---|---|---|
+| POD2, copia integrale di POD1 | accettato, `riproduce` scritto | **accettato**, `causa_parziale='RIPRODUCE'` |
+| POD3, 6 pagine su 12 originali | rifiutato, elenco pagine | **rifiutato**, `Pagine NON riprodotte: 7-12` |
+| registro dopo un rifiuto | non modificato | **`causa_parziale=None`** — nulla scritto |
+| `sintesi` e `nota` dopo entrambi | intatte | **intatte** |
+| rassegna dopo la prova | segnala solo POD3 | **1 voce, POD3** |
+| `copertura.py stato` | due misure | `3/3 = 100.0% (documenti)` · `14/36 = 38.9% (pagine)` |
+
+> Durante la prova `stato` è andato in errore con `KeyError: 'totale'`. **Controprova sul
+> `copertura.py` originale: stesso errore.** Era il registro di laboratorio incompleto, non una
+> regressione — verificato prima di proseguire, non dato per scontato.
+
+### Dimensione del file dopo la patch
+
+`copertura.py` patchato: **116.426 byte** (era 105.602).
