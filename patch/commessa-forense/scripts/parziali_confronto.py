@@ -319,11 +319,26 @@ def spiega(esito, percorso="", riferimenti=""):
 # lasciapassare), e questo modulo deve poter passare in rassegna un fascicolo
 # senza tirarsi dietro l'intero copertura.
 RIPRODUZIONE_AFFERMATA = (
+    # Il contenuto sta in un ALTRO atto.
     "riproduc", "gia letto", "gia letta", "gia lette", "gia letti",
     "copia di", "copia del", "copia della", "e copia", "identic",
     "duplicat", "stesso testo", "medesimo testo", "stesso contenuto",
     "medesimo contenuto", "gia presente", "gia acquisit", "gia visto",
     "riportato in", "riportata in", "si ritrova in", "coincide con",
+    # Il contenuto si ripete DENTRO lo stesso atto, o ricalca una struttura
+    # gia' vista altrove. E' la stessa affermazione - «il resto e' gia' noto» -
+    # e va provata allo stesso modo.
+    #
+    # Misurato l'11 settembre 2026 sul registro vero di Caltagirone: delle 175
+    # letture parziali, le spie del primo gruppo ne intercettavano ZERO e queste
+    # ne intercettano QUARANTA, che lasciano fuori 2.803 pagine. Fra queste,
+    # cinque relazioni di calcolo da 231 a 584 pagine (#687-#692), tutte con la
+    # sola copertina letta e tutte motivate con «struttura standard gia'
+    # riscontrata su POD1». Il primo elenco era tarato sul caso del D.D.G. 3 e
+    # cieco all'idioma che i lettori usano davvero.
+    "ripetitiv", "ripetut", "ripetizion",
+    "struttura standard", "struttura analoga", "stessa struttura",
+    "medesima struttura", "gia riscontrat", "del tutto simil", "uguale a",
 )
 
 
