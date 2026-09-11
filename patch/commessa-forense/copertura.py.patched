@@ -1,0 +1,2114 @@
+#!/usr/bin/env python3
+"""
+Cancello di copertura: fa quadrare tre numeri che di norma nessuno confronta.
+
+  CENSITI      quanti file ci sono davvero nella cartella e nelle sottocartelle
+  INDICIZZATI  quanti ne ha acquisiti il motore di ricerca (commessa-rag)
+  LETTI        quanti sono stati effettivamente guardati, uno per uno
+
+Il terzo numero e' quello che manca a tutti gli altri strumenti, e la ragione e'
+strutturale: una ricerca restituisce solo cio' che la domanda pesca. Un atto che
+nessuna query recupera non entra mai nell'analisi e nessuno se ne accorge - il
+motore certifica che il documento e' DISPONIBILE, non che qualcuno l'abbia letto.
+
+Il divario fra il primo e il secondo numero e' altrettanto interessante: sono i
+file che il motore ha saltato in silenzio.
+"""
+import argparse, hashlib, json, os, re, sqlite3, struct, subprocess, sys, time
+import unicodedata
+from contextlib import contextmanager
+from datetime import datetime
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import strumenti
+
+# Su Windows le aggiunte al PATH dell'utente non arrivano ai processi gia'
+# avviati, nemmeno riavviandoli: senza questa riga `pdfimages` risulta assente
+# in un ambiente in cui c'e'.
+strumenti.integra_path()
+
+IGNORA_NOMI = {".DS_Store", "Thumbs.db", "desktop.ini", ".gitkeep"}
+IGNORA_DIR = {"_inventario", ".commessa-rag", ".git", ".svn", "__pycache__",
+              ".Trash", "$RECYCLE.BIN", "System Volume Information", "node_modules"}
+SENZA_TESTO = {".dwg", ".dxf", ".dwf", ".ifc", ".rvt", ".skp", ".jpg", ".jpeg",
+               ".png", ".tif", ".tiff", ".bmp", ".gif", ".heic", ".mp4", ".mov"}
+
+# Questi NON sono allegati muti: sono involucri che contengono atti. Un `.p7m`
+# e' la busta firmata dell'originale - la determina di aggiudicazione arriva
+# quasi sempre cosi' - e uno `.zip` puo' contenere dodici SAL. Contarli fra i
+# «senza testo» significava dichiararli coperti senza che nessuno li aprisse:
+# il fascicolo chiudeva a «copertura completa» con dentro atti mai visti.
+CONTENITORI = {".zip", ".rar", ".7z", ".p7m"}
+
+# Gli stati che rappresentano un lavoro gia' fatto da qualcuno: qualcuno ha
+# aperto il documento e ha deciso. Non si riscrivono senza dirlo, e la sintesi
+# che li accompagna non si butta mai.
+ACQUISITE = ("LETTO", "PARZIALE", "ESCLUSO")
+
+# Cio' che in una cartella di commessa non e' un atto ma un attrezzo: codice che
+# ha prodotto gli atti, backup, registri di lavoro. Contarli nel denominatore
+# significherebbe pretendere una scheda di lettura per uno script Python; non
+# contarli affatto significherebbe farli sparire. Vengono contati a parte.
+#
+# L'elenco e' deliberatamente stretto. Restano FUORI .json e .xml, che in un
+# fascicolo possono benissimo essere atti - la ricevuta `daticert.xml` di una
+# PEC e' la prova della consegna, non un file di servizio - e restano fuori
+# tutte le estensioni documentali. Nel dubbio un file resta un atto: chiedere
+# una scheda in piu' costa una riga, perdere un atto costa il contenzioso.
+ESTENSIONI_SERVIZIO = {".py", ".pyc", ".js", ".sh", ".bat", ".cmd", ".ps1", ".vbs",
+                       ".bak", ".tmp", ".temp", ".old", ".swp", ".log",
+                       ".db", ".sqlite", ".sqlite3", ".lock", ".pyo"}
+
+# Un estratto testuale prodotto da uno strumento dichiara nell'intestazione da
+# quale file viene: e' la traccia piu' affidabile per non ricontare lo stesso
+# contenuto due volte.
+INTESTAZIONE_ESTRATTO = re.compile(
+    r"estratto\s+testuale\s+(?:automatico\s+)?di\s*:\s*(.+)", re.I)
+
+
+# Immagini che uno strumento produce estraendole da un PDF. Un fascicolo puo'
+# contenerne di proprie - una fotografia di cantiere e' un atto a tutti gli
+# effetti - quindi il formato da solo non decide nulla: decide la misura.
+IMMAGINI_RASTER = {".png", ".jpg", ".jpeg"}
+DOCUMENTI_SORGENTE = (".pdf",)
+_IMMAGINI_DEL_PDF = {}
+
+
+# --------------------------------------------------------------- provenienza
+# Un fascicolo di commessa contiene due specie di documenti, e confonderle e' un
+# errore di natura diversa da tutti gli altri: gli ATTI, che qualcuno ci ha
+# trasmesso o che sono stati scambiati fra le parti, e i NOSTRI ELABORATI, che
+# abbiamo prodotto noi analizzando i primi. Solo i primi provano qualcosa.
+#
+# Il riconoscimento e' per indizi, e gli indizi sono di tre specie, dalla piu'
+# sicura alla piu' debole. Nessuno di essi cancella il file: lo sposta in una
+# classe che resta scritta nella tabella di copertura, e che l'utente puo'
+# ribaltare con `classe --atto`.
+
+# 1. La cartella. I nostri strumenti scrivono in cartelle che cominciano per «_»
+#    e portano il nome dell'ufficio che le ha prodotte.
+_CARTELLE_NOSTRE = re.compile(
+    r"^_(?:ufficio|analisi|claims|riserve|consolidamento|studio|verifica|"
+    r"lavoro|elaborati_cea|cea)", re.IGNORECASE)
+
+# 2. L'estensione. In un fascicolo di appalto un atto ricevuto e' un PDF, un
+#    documento di testo, un foglio di calcolo, una busta firmata o una e-mail:
+#    non e' mai un file Markdown. Il markdown, in queste cartelle, e' sempre
+#    nostro - e se per una volta non lo fosse, si sposta a mano.
+_ESTENSIONI_NOSTRE = {".md", ".rpt"}
+
+# 3. L'intestazione. I nostri elaborati si firmano: il nome dello studio INSIEME
+#    a un marcatore di produzione. Il nome da solo non basta e non deve bastare -
+#    una lettera della Stazione appaltante indirizzata a noi porta il nostro nome
+#    in testa ed e' un atto ricevuto a tutti gli effetti.
+_FIRMA_NOSTRA = re.compile(r"c\.?\s?e\.?\s?a\.?\s+engineering|perla engineering",
+                           re.IGNORECASE)
+_MARCATORE_PRODUZIONE = re.compile(
+    r"plugin\s+v\d|ufficio\s+(?:gare|claims|riserve|legale|progettazione|put|"
+    r"valutazioni|verifiche)|^#{1,2}\s*fase\s+\d|redatta il|"
+    r"generat[oa]\s+(?:da|con)|orchestratore", re.IGNORECASE | re.MULTILINE)
+
+
+# 4. La CARTELLA-ATTREZZO. I tre criteri qui sopra guardano il nome della prima
+#    cartella, l'estensione e il testo: tutti e tre sono ciechi su un albero di
+#    SOFTWARE finito in fascicolo, perche' i suoi file non hanno testo da
+#    leggere (loghi, .jpg d'esempio, .json) e la sua cartella non si chiama
+#    `_ufficio`. Misurato il 7 settembre 2026 sulla gara Agrorinasce: dentro il
+#    fascicolo stavano due alberi di plugin - `ufficio-gare-v1.1.0/` e
+#    `_PLUGIN_SCHEDE_5C/` - e `propri` rispondeva «nessun atto sembra un nostro
+#    elaborato» mentre 34 immagini di esempio stavano nel denominatore. Non e' un
+#    rischio di citazione (da un logo non si cita niente): e' un cancello di
+#    copertura che non si chiude piu', perche' pretende una scheda di lettura per
+#    i loghi di prova di un plugin.
+#
+#    Il criterio non e' il nome ma la PROVA: un albero che contiene un
+#    `plugin.json`, un `SKILL.md` o una terna `skills/ agents/ scripts/` e'
+#    software, e in un fascicolo di atti il software e' sempre nostro. E vale a
+#    QUALSIASI profondita', non solo sulla prima cartella.
+_PROVE_ATTREZZO = {"plugin.json", "skill.md", "package.json", "requirements.txt",
+                   "pyproject.toml"}
+_DIR_ATTREZZO = {"skills", "agents", "scripts", "references", "commands", "hooks"}
+# Le estensioni con cui arriva un ATTO. La loro presenza dentro un albero e' cio'
+# che impedisce di dichiararlo attrezzatura: e' il freno di sicurezza di tutta
+# questa euristica.
+_EXT_DI_ATTI = {".pdf", ".p7m", ".docx", ".doc", ".xlsx", ".xls", ".xlsm",
+                ".eml", ".msg", ".dwg", ".dxf", ".rtf"}
+
+
+def cartelle_attrezzo(percorsi) -> set:
+    """Le cartelle del fascicolo che sono alberi di SOFTWARE, non di atti.
+
+    Due condizioni, e la seconda e' quella che rende sicura la prima:
+
+      1. nel sottoalbero c'e' la prova di un software - un `plugin.json`, uno
+         `SKILL.md`, un `requirements.txt`;
+      2. nel sottoalbero non c'e' **nessun atto**: nessun PDF, nessuna busta
+         firmata, nessun documento di testo o foglio di calcolo.
+
+    Senza la seconda, la prima sarebbe pericolosa: bastava che un `plugin.json`
+    finisse dentro `Documenti di Gara` per spazzare via l'intero fascicolo. Con
+    la seconda il caso peggiore e' che un albero misto resti fra gli atti, che e'
+    l'errore dalla parte giusta - li' un umano deve guardare comunque.
+
+    Si prende la cartella PIU' ALTA che soddisfa entrambe. Cercando la piu' bassa
+    - il primo tentativo - si trovava `ufficio-gare-v1.1.0/ufficio-gare/skills/
+    ufficio-gare`, cioe' la cartella dove sta lo SKILL.md invece della radice
+    dell'albero, e l'archivio che l'aveva prodotta restava fra gli atti.
+    """
+    nomi, esti, sottocartelle = {}, {}, {}
+    for rel in percorsi:
+        parti = Path(rel).parts
+        ext = Path(rel).suffix.lower()
+        for i in range(len(parti) - 1):
+            padre = "/".join(parti[:i + 1])
+            nomi.setdefault(padre, set()).add(parti[-1].lower())
+            esti.setdefault(padre, set()).add(ext)
+            # figlio diretto, e solo se a sua volta e' una cartella
+            if i + 2 < len(parti):
+                sottocartelle.setdefault(padre, set()).add(parti[i + 1].lower())
+    # Due prove, alternative fra loro. La seconda serve perche' non tutti gli
+    # attrezzi portano un manifesto: `_PLUGIN_SCHEDE_5C`, trovato nel fascicolo
+    # Agrorinasce, non ha nessun plugin.json - ha `agents/`, `references/` e
+    # `scripts/`, che come prova valgono quanto un manifesto.
+    candidate = {c for c in nomi
+                 if ((nomi[c] & _PROVE_ATTREZZO)
+                     or len(sottocartelle.get(c, set()) & _DIR_ATTREZZO) >= 2)
+                 and not (esti[c] & _EXT_DI_ATTI)}
+    # la piu' alta vince: si scartano quelle che stanno dentro un'altra candidata
+    return {c for c in candidate
+            if not any(c.startswith(x + "/") for x in candidate if x != c)}
+
+
+def e_nostro(rel: str, testa: str = "", attrezzi=()) -> str:
+    """Perche' questo file sembra un nostro elaborato, o «» se non lo sembra."""
+    prima = Path(rel).parts[0] if Path(rel).parts else ""
+    if _CARTELLE_NOSTRE.match(prima):
+        return f"sta in «{prima}», una cartella prodotta dai nostri strumenti"
+    dritto = str(rel).replace("\\", "/")
+    for c in attrezzi:
+        if dritto.startswith(c + "/"):
+            return (f"sta in «{c}», che e' un albero di SOFTWARE e non di atti "
+                    f"(ci si e' trovato dentro un plugin.json, uno SKILL.md o "
+                    f"le cartelle di un plugin)")
+        # L'archivio che ha PRODOTTO un albero di software e' software anche lui.
+        # Senza questa riga `ufficio-gare-v1.1.0.zip` restava un atto da leggere
+        # mentre i suoi 33 file estratti erano gia' stati riconosciuti nostri:
+        # il contenitore sopravviveva alla riclassificazione del contenuto.
+        if dritto.rsplit(".", 1)[0] == c:
+            return (f"e' il contenitore da cui esce «{c}», un albero di SOFTWARE: "
+                    f"cio' che contiene non sono atti")
+    if Path(rel).suffix.lower() in _ESTENSIONI_NOSTRE:
+        return f"e' un file {Path(rel).suffix.lower()}: in un fascicolo di atti il markdown e' nostro"
+    if testa and _FIRMA_NOSTRA.search(testa) and _MARCATORE_PRODUZIONE.search(testa):
+        return "l'intestazione porta la nostra firma e un marcatore di produzione"
+    return ""
+
+
+def _misura_immagine(p: Path):
+    """Larghezza e altezza in pixel, lette dai byte del file. None se non si sa.
+
+    Le dimensioni in pixel sono una proprieta' dell'IMMAGINE e non del file, e
+    per questo reggono il confronto: chi estrae le immagini da un PDF le
+    ricodifica, e byte per byte non coincidono piu' - misurato, zero su dodici -
+    mentre in pixel coincidono tutte.
+    """
+    try:
+        dato = p.read_bytes()[:262144]
+    except OSError:
+        return None
+    if dato[:8] == b"\x89PNG\r\n\x1a\n" and dato[12:16] == b"IHDR":
+        larghezza, altezza = struct.unpack(">II", dato[16:24])
+        return (larghezza, altezza)
+    if dato[:2] == b"\xff\xd8":
+        i = 2
+        while i + 9 < len(dato):
+            if dato[i] != 0xFF:
+                i += 1
+                continue
+            marcatore = dato[i + 1]
+            # SOF0..SOF15, escluse le tabelle di Huffman e i riavvii
+            if 0xC0 <= marcatore <= 0xCF and marcatore not in (0xC4, 0xC8, 0xCC):
+                altezza, larghezza = struct.unpack(">HH", dato[i + 5:i + 9])
+                return (larghezza, altezza)
+            if marcatore in (0xD8, 0x01) or 0xD0 <= marcatore <= 0xD7:
+                i += 2
+                continue
+            lunghezza = struct.unpack(">H", dato[i + 2:i + 4])[0]
+            i += 2 + lunghezza
+    return None
+
+
+def _immagini_dentro(pdf: Path):
+    """Le dimensioni in pixel delle immagini contenute in un PDF."""
+    chiave = str(pdf)
+    if chiave in _IMMAGINI_DEL_PDF:
+        return _IMMAGINI_DEL_PDF[chiave]
+    misure = set()
+    try:
+        r = subprocess.run(["pdfimages", "-list", str(pdf)], capture_output=True,
+                           text=True, encoding="utf-8", errors="replace", timeout=120)
+        # Colonne verificate sull'uscita reale, non supposte: page num type
+        # width height ... - larghezza e altezza sono la quarta e la quinta.
+        for riga in (r.stdout or "").splitlines()[2:]:
+            campi = riga.split()
+            if len(campi) > 4 and campi[3].isdigit() and campi[4].isdigit():
+                misure.add((int(campi[3]), int(campi[4])))
+    except (OSError, subprocess.SubprocessError):
+        misure = set()
+    _IMMAGINI_DEL_PDF[chiave] = misure
+    return misure
+
+
+def _immagine_estratta(p: Path, rel: str, per_nome: dict, radice: Path) -> str:
+    """Il percorso del PDF da cui questa immagine e' stata estratta, o «».
+
+    Il nome propone, la misura decide. Gli strumenti di estrazione battezzano il
+    file col nome del PDF piu' un suffisso - «Tavola 7 - Copia9b225d71.png» da
+    «Tavola 7.pdf» - e quel nome basta a proporre un candidato, ma non a
+    concludere: due file possono chiamarsi cosi' per caso. Si conclude solo se
+    le dimensioni in pixel dell'immagine compaiono fra quelle delle immagini
+    contenute in quel PDF.
+
+    Nato il 5 settembre 2026 su un fascicolo di lavori pubblici, dove una
+    cartella «PDF Images» conteneva ventiquattro PNG - dodici immagini in doppia
+    copia - estratti da una tavola gia' presente nel fascicolo. Erano dodici
+    atti nel denominatore, e ciascuno pretendeva una scheda di lettura per un
+    disegno gia' contato.
+    """
+    if not strumenti.dove("pdfimages"):
+        return ""
+    mia = _misura_immagine(p)
+    if not mia:
+        return ""
+    radice_nome = p.stem.lower()
+    candidati = []
+    for nome, elenco in per_nome.items():
+        radice_pdf = Path(nome).stem.lower()
+        if (Path(nome).suffix.lower() in DOCUMENTI_SORGENTE
+                and len(radice_pdf) >= 8
+                and radice_nome.startswith(radice_pdf)
+                and radice_nome != radice_pdf):
+            candidati.extend(elenco)
+    origine = _scegli_origine(candidati, rel)
+    if not origine:
+        # Fuori dalla cartella e fuori dall'unicita' non si sceglie, ma qui c'e'
+        # un caso in piu' che la trascrizione non ha: l'estrattore scrive in una
+        # SOTTOCARTELLA del PDF di partenza («PDF Images»), quindi vale anche
+        # il padre della cartella in cui sto.
+        sopra = Path(rel).parent.parent
+        vicini = [r for r, _ in candidati if Path(r).parent == sopra]
+        if len(vicini) != 1:
+            return ""
+        origine = vicini[0]
+    return origine if mia in _immagini_dentro(radice / origine) else ""
+
+
+def _classifica_file(p: Path, rel: str, per_nome: dict, radice: Path = None):
+    """Restituisce (classe, riferimento). Le tre classi sono:
+
+      ATTO      entra nel denominatore e pretende una scheda di lettura
+      DERIVATO  e' un'altra forma di un atto gia' presente: si aggancia a lui
+      SERVIZIO  non e' un documento del fascicolo: si conta a parte
+
+    Nessuna delle tre sparisce dalla tabella di copertura: cambia solo se
+    pretende di essere letta.
+    """
+    ext = p.suffix.lower()
+    if ext in ESTENSIONI_SERVIZIO:
+        return "SERVIZIO", ""
+    # La provenienza viene prima di tutto il resto: un nostro elaborato non e' un
+    # atto nemmeno se ne ha la forma. Per i file di testo si guarda anche
+    # l'intestazione; per gli altri bastano cartella ed estensione, e quelli che
+    # restano fuori li prende il comando `propri`, che legge dall'indice.
+    testa = ""
+    if ext in (".txt", ".md"):
+        try:
+            testa = p.read_text("utf-8", "replace")[:900]
+        except OSError:
+            testa = ""
+    motivo = e_nostro(rel, testa)
+    if motivo:
+        return "PROPRIO", motivo
+    if ext in (".txt", ".md"):
+        try:
+            testa = p.read_text("utf-8", "replace")[:400]
+        except OSError:
+            testa = ""
+        m = INTESTAZIONE_ESTRATTO.search(testa)
+        if m:
+            citato = m.group(1).strip().strip('"“”')
+            r = _scegli_origine(per_nome.get(citato, ()), rel)
+            if r:
+                return "DERIVATO", r
+            base = Path(citato).stem.lower()
+            omonimi = [x for nome, elenco in per_nome.items()
+                       if Path(nome).stem.lower() == base for x in elenco]
+            r = _scegli_origine(omonimi, rel)
+            if r:
+                return "DERIVATO", r
+        # Un .txt che porta lo stesso nome di un documento presente e' la sua
+        # trascrizione, non un secondo atto.
+        for altra in (".pdf", ".docx", ".doc", ".xlsx", ".rtf"):
+            r = _scegli_origine(per_nome.get(p.stem + altra, ()), rel)
+            if r:
+                return "DERIVATO", r
+    if ext in IMMAGINI_RASTER and radice is not None:
+        r = _immagine_estratta(p, rel, per_nome, radice)
+        if r:
+            return "DERIVATO", r
+    return "ATTO", ""
+
+
+def _scegli_origine(candidati, rel: str) -> str:
+    """Fra piu' documenti omonimi, quale e' l'originale di `rel`.
+
+    L'indice dei nomi copre tutto l'albero, e finche' e' stato interrogato senza
+    guardare la cartella ha prodotto agganci inventati. Misurato il 4 settembre
+    2026 sulla struttura ordinaria di una contabilita' - una cartella per SAL, e
+    in ciascuna lo stesso `Riepilogo.pdf`: una lettera in «01 Corrispondenza»
+    veniva dichiarata trascrizione del riepilogo del SAL 12, scelto solo perche'
+    ultimo nell'ordine di scansione. Il file usciva dal denominatore in
+    silenzio - i derivati non pretendono scheda - e nei rapporti finiva una
+    provenienza falsa.
+
+    Vince la cartella: la trascrizione sta accanto al suo originale. Se li' non
+    c'e', si accetta solo il nome UNICO nel fascicolo. Se restano piu' candidati
+    sparsi non si sceglie, e il file resta un atto: e' il principio dichiarato
+    in testa a questo modulo - chiedere una scheda in piu' costa una riga,
+    perdere un atto costa il contenzioso.
+    """
+    # Mai se stesso: il ramo che cerca per radice del nome trova anche il file
+    # che sta classificando, e senza questa riga cinque estratti risultavano
+    # derivati di se stessi - un anello che nei rapporti si legge come una
+    # provenienza.
+    candidati = [(r, d) for r, d in candidati if r != rel]
+    if not candidati:
+        return ""
+    mia = Path(rel).parent
+    stessa = [r for r, _ in candidati if Path(r).parent == mia]
+    if len(stessa) == 1:
+        return stessa[0]
+    if stessa:
+        return ""
+    if len(candidati) == 1:
+        return candidati[0][0]
+    # Piu' candidati sparsi. Se hanno tutti la stessa dimensione sono lo stesso
+    # documento allegato a destinatari diversi - il caso ordinario di un
+    # fascicolo - e allora la scelta non e' arbitraria: vale la collocazione
+    # meno profonda, la stessa regola con cui si sceglie il capofila fra le
+    # copie. Se invece le dimensioni differiscono sono documenti diversi con lo
+    # stesso nome, e li' non si sceglie.
+    if len({d for _, d in candidati}) == 1:
+        return min((r for r, _ in candidati), key=lambda r: (len(Path(r).parts), r))
+    return ""
+
+
+def stato_file(percorso):
+    return Path(percorso).expanduser().resolve() / "_inventario" / "copertura.json"
+
+
+def allinea_radice(S, f):
+    """Il registro deve dire dove si trova ADESSO, non dov'era al censimento.
+
+    `radice` e' un percorso assoluto scritto una volta sola, e diventa una
+    bugia appena il fascicolo viene copiato o spostato - cosa che capita di
+    continuo: una copia di lavoro, un trasferimento su un altro disco, un
+    fascicolo mandato a un collega.
+
+    Non e' un dettaglio estetico. Misurato il 4 settembre 2026 con i lettori
+    veri: uno di essi ha aperto il registro della commessa su cui doveva
+    lavorare, ci ha letto un `radice` che indicava UN'ALTRA cartella - quella
+    da cui la copia era stata fatta - e ha registrato li' le sue quattordici
+    schede, riferendo in buona fede di averle registrate. Il fascicolo su cui
+    lavorava e' rimasto scoperto e nessun messaggio lo diceva.
+
+    Anche i due rapporti consegnati stampano questo campo come «Cartella:»,
+    quindi la bugia arrivava fino al cliente.
+    """
+    vera = str(f.parent.parent)
+    if S.get("radice") != vera:
+        S["radice"] = vera
+    return S
+
+
+def carica(cartella):
+    f = stato_file(cartella)
+    if not f.exists():
+        sys.exit(f"ERRORE: nessun censimento in {f}. Eseguire prima: copertura.py censisci")
+    S = allinea_radice(json.loads(f.read_text("utf-8")), f)
+    # Si sana anche cio' che e' gia' scritto: un fascicolo censito prima di
+    # questa correzione porta ancora le schede illeggibili, e da quelle schede
+    # nascono i rapporti che escono. La riparazione e' idempotente, quindi
+    # farla a ogni caricamento non costa nulla e non peggiora un testo sano.
+    for v in S["file"]:
+        for campo in ("sintesi", "nota"):
+            if v.get(campo):
+                v[campo] = ripara_mojibake(v[campo])
+    return f, S
+
+
+def salva(f, S):
+    """Scrittura atomica: si scrive accanto e si sostituisce in un colpo solo.
+
+    Se il processo muore a meta' di una write diretta, il registro di lettura
+    resta troncato e illeggibile - e con lui l'unica prova di quali atti siano
+    stati guardati. os.replace e' atomico su Windows come su POSIX."""
+    tmp = f.with_name(f.name + f".tmp{os.getpid()}")
+    tmp.write_text(json.dumps(S, ensure_ascii=False, indent=1), encoding="utf-8")
+    os.replace(tmp, f)
+
+
+# --------------------------------------------------------------- concorrenza
+ATTESA_LOCK = 120        # secondi di attesa prima di rinunciare
+LOCK_ABBANDONATO = 900   # oltre questo, il lock e' di un processo morto
+
+
+@contextmanager
+def stato_esclusivo(cartella, attesa=ATTESA_LOCK):
+    """Carica lo stato, lo fa modificare, lo salva - senza che due processi si
+    sovrascrivano a vicenda.
+
+    Serve perche' il flusso prevede piu' lettori in parallelo su lotti diversi,
+    e tutti registrano sullo stesso `copertura.json` con la sequenza carica →
+    modifica → salva. Senza mutua esclusione, di due che chiudono insieme
+    l'ultimo che salva riscrive il registro dell'altro e le sue letture
+    spariscono SENZA errore: il fascicolo risulterebbe meno letto di quanto e',
+    o - peggio - altrettanto letto ma con schede mancanti. E' esattamente il
+    guasto silenzioso che questo plugin esiste per impedire, commesso da noi.
+
+    Il lock e' un file creato in modo esclusivo (O_EXCL), che su Windows e su
+    POSIX e' un'operazione atomica del filesystem. Chi lo trova occupato
+    aspetta. Un lock piu' vecchio di LOCK_ABBANDONATO e' di un processo morto e
+    viene rimosso, altrimenti un'interruzione bloccherebbe la commessa per
+    sempre.
+    """
+    f = stato_file(cartella)
+    if not f.exists():
+        sys.exit(f"ERRORE: nessun censimento in {f}. Eseguire prima: copertura.py censisci")
+    lock = f.with_name(f.name + ".lock")
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    fine = time.time() + attesa
+    fd = None
+    while True:
+        try:
+            fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            break
+        except FileExistsError:
+            try:
+                mtime = lock.stat().st_mtime
+            except OSError:
+                continue                      # rilasciato proprio ora: riprova
+            eta = time.time() - mtime
+            if eta > LOCK_ABBANDONATO:
+                # Non si cancella «il lock»: si sposta QUELLO di cui si e'
+                # appena misurata l'eta'. La rename e' atomica e riesce a un
+                # solo processo, e chi si ritrova in mano un file con un'altra
+                # data ha spostato il lock VIVO di un altro e lo rimette al suo
+                # posto invece di distruggerlo.
+                #
+                # La `unlink` cieca apriva una finestra fra la misura e la
+                # cancellazione. Riprodotta il 4 settembre 2026 sospendendo un
+                # processo esattamente li': B riprende quando sul disco c'e'
+                # gia' il lock vivo di A, lo cancella, e i due si ritrovano
+                # DENTRO la sezione critica insieme - leggono lo stesso
+                # registro e lo riscrivono a turno. La scheda di A e' sparita
+                # e i due comandi sono usciti entrambi con «Registrati 1
+                # documenti». E' il guasto silenzioso che questo plugin esiste
+                # per impedire, commesso da noi. In 70 giri di concorrenza vera
+                # non e' capitato - la finestra e' strettissima - ma il flusso
+                # prevede piu' lettori in parallelo su ogni commessa, e un
+                # registro perduto non lascia traccia di se'.
+                scarto = lock.with_name(f"{lock.name}.scaduto{os.getpid()}")
+                try:
+                    os.replace(lock, scarto)
+                except OSError:
+                    continue              # l'ha gia' preso un altro: si riprova
+                try:
+                    era_quello = abs(scarto.stat().st_mtime - mtime) < 0.001
+                except OSError:
+                    era_quello = False
+                if era_quello:
+                    print(f"  (rimosso un lock abbandonato da {eta/60:.0f} minuti)",
+                          file=sys.stderr)
+                    scarto.unlink(missing_ok=True)
+                else:
+                    # Era il lock vivo di un altro processo: si rimette dov'era.
+                    try:
+                        os.replace(scarto, lock)
+                    except OSError:
+                        scarto.unlink(missing_ok=True)
+                continue
+            if time.time() > fine:
+                sys.exit(f"ERRORE: registro occupato da un altro processo da oltre "
+                         f"{attesa}s ({lock}).\nSe nessun altro lettore sta lavorando, "
+                         f"cancellare quel file e ripetere.")
+            time.sleep(0.2)
+    # Un contrassegno che identifica QUESTO lock e nessun altro: serve a non
+    # cancellare, uscendo, il lock di un altro processo.
+    contrassegno = f"{os.getpid()} {datetime.now().isoformat()} {os.urandom(6).hex()}"
+    try:
+        os.write(fd, (contrassegno + "\n").encode("utf-8"))
+        os.close(fd)
+        fd = None
+        S = allinea_radice(json.loads(f.read_text("utf-8")), f)
+        yield f, S
+        salva(f, S)
+    finally:
+        if fd is not None:
+            os.close(fd)
+        # Si rilascia il PROPRIO lock, non «il lock». Uscendo si cancellava
+        # qualunque file ci fosse a quel nome: se nel frattempo un altro
+        # processo era entrato - e la finestra qui sopra lo consentiva - il
+        # derubato consegnava ai terzi anche il lock del ladro, allargando il
+        # guasto invece di fermarlo.
+        try:
+            if lock.read_text("utf-8").strip() == contrassegno:
+                lock.unlink()
+        except OSError:
+            pass
+
+
+# --------------------------------------------------------------- duplicati
+def trova_duplicati(voci, radice: Path):
+    """Raggruppa gli atti che hanno contenuto IDENTICO.
+
+    Lo stesso provvedimento allegato a tre destinatari e' un documento solo, e
+    va letto una volta: misurato su un fascicolo vero, 31 file su 133 erano
+    duplicati esatti in 10 gruppi - il 23 per cento - e il diniego, presente in
+    tre copie, e' costato tre schede di lettura identiche.
+
+    La collocazione pero' non si butta via: quelle copie stavano negli allegati
+    a destinatari diversi, e **dimostrano cosa e' stato trasmesso a chi**. Per
+    questo il capofila si porta dietro l'elenco di tutte le collocazioni, che
+    finisce nella tabella di copertura.
+
+    Si confrontano solo i file di pari dimensione, e si legge dal disco solo
+    quando quella dimensione e' condivisa: su un fascicolo di qualche centinaio
+    di megabyte il calcolo resta trascurabile.
+    """
+    per_dim = {}
+    for v in voci:
+        if v["classe"] == "ATTO":
+            per_dim.setdefault(v["byte"], []).append(v)
+    gruppi = {}
+    for stesso, elenco in per_dim.items():
+        if len(elenco) < 2 or stesso == 0:
+            continue
+        for v in elenco:
+            try:
+                h = hashlib.sha256((radice / v["percorso"]).read_bytes()).hexdigest()
+            except OSError:
+                continue
+            gruppi.setdefault(h, []).append(v)
+    n = 0
+    for elenco in gruppi.values():
+        if len(elenco) < 2:
+            continue
+        elenco.sort(key=lambda v: (v["percorso"].count(os.sep), v["percorso"]))
+        capofila, copie = elenco[0], elenco[1:]
+        capofila["altre_collocazioni"] = [v["percorso"] for v in copie]
+        for v in copie:
+            v["classe"] = "DUPLICATO"
+            v["duplicato_di"] = capofila["percorso"]
+            v["lettura"] = "DUPLICATO"
+            n += 1
+    return n
+
+
+# --------------------------------------------------------------- censimento
+def scandisci(radice: Path, suffisso: str = "_OCR"):
+    """La cartella come la vede il censimento: (trovati, derivati, ignorati, orfani).
+
+    Sta in una funzione sola perche' la usano in due - il censimento, che scrive il
+    registro, e il cancello di copertura, che deve accorgersi di cio' che e' comparso
+    DOPO. Se le due scansioni divergessero, il cancello segnalerebbe come nuovi dei
+    file che il censimento assorbe, e nessuno gli crederebbe piu'.
+    """
+    trovati, derivati, ignorati = [], {}, []
+    ocr_candidati = []
+    for dirpath, dirnames, filenames in os.walk(radice):
+        dirnames[:] = [d for d in sorted(dirnames)
+                       if d not in IGNORA_DIR and not d.startswith(".")]
+        for nome in sorted(filenames):
+            p = Path(dirpath) / nome
+            if nome in IGNORA_NOMI or nome.startswith("~$") or nome.startswith("."):
+                ignorati.append({"percorso": str(p.relative_to(radice)),
+                                 "motivo": "file di sistema o nascosto"})
+                continue
+            rel = str(p.relative_to(radice))
+            # Un PDF prodotto dal nostro OCR non e' un altro documento: e' la
+            # versione leggibile di quello originale. Contarlo a parte gonfierebbe
+            # il denominatore e farebbe sembrare il fascicolo piu' grande di com'e'.
+            # La decisione pero' non si puo' prendere qui: l'originale potrebbe
+            # non esistere - un fascicolo puo' arrivare gia' riconosciuto, o
+            # l'originale essere stato spostato - e in quel caso il file _OCR
+            # e' l'UNICA copia dell'atto. Scartarlo lo faceva sparire dal
+            # denominatore senza lasciare traccia da nessuna parte.
+            if p.suffix.lower() == ".pdf" and p.stem.endswith(suffisso):
+                originale = str((p.parent / (p.stem[: -len(suffisso)] + ".pdf")
+                                 ).relative_to(radice))
+                ocr_candidati.append((p, rel, originale))
+                continue
+            # Lo stesso vale per il contenuto estratto da una busta firmata.
+            # `X.pdf` accanto a `X.pdf.p7m` non e' un secondo atto: e' la forma
+            # leggibile del primo, e l'ORIGINALE e' la busta - li' sta la firma,
+            # che in una gara e' cio' che fa fede. Misurato il 5 settembre 2026
+            # su un fascicolo di gara: aperte le quindici buste, il denominatore
+            # passava da 35 a 49 contando due volte gli stessi quattordici atti,
+            # e le buste restavano «da aprire» dopo essere state aperte.
+            if (p.parent / (p.name + ".p7m")).exists():
+                ocr_candidati.append((p, rel, rel + ".p7m"))
+                continue
+            trovati.append((p, rel))
+
+    # Ora si sa quali file esistono davvero, e il destino dei PDF riconosciuti
+    # si puo' decidere: derivati se l'originale c'e', atti a pieno titolo se no.
+    presenti = {r for _, r in trovati}
+    orfani = 0
+    for p, rel, originale in ocr_candidati:
+        if originale in presenti:
+            derivati[originale] = rel
+        else:
+            trovati.append((p, rel))
+            orfani += 1
+    return trovati, derivati, ignorati, orfani
+
+
+def deriva_dal_censimento(S, radice: Path, suffisso: str = "_OCR"):
+    """Che cosa e' cambiato sul disco da quando il registro e' stato scritto.
+
+    Ritorna (comparsi, spariti): percorsi relativi. Un file assorbito come versione
+    riconosciuta di un altro non e' un file nuovo, e per questo non basta confrontare
+    i nomi: si rifa' la stessa scansione del censimento.
+    """
+    try:
+        trovati, derivati, _ign, _orf = scandisci(radice, suffisso)
+    except OSError:
+        # Due valori, non tre: l'unico chiamante scompatta `comparsi, spariti`,
+        # e un ramo di degrado che fa morire il comando invece di degradare e'
+        # peggio del guasto che voleva assorbire.
+        return [], []
+    su_disco = {rel for _, rel in trovati}
+    nel_registro = {v["percorso"] for v in S["file"]}
+    # Le versioni riconosciute registrate accanto al loro originale non sono voci
+    # del registro e non devono risultare sparite.
+    assorbite = {v.get("versione_ocr") for v in S["file"] if v.get("versione_ocr")}
+    comparsi = sorted(su_disco - nel_registro)
+    spariti = sorted(nel_registro - su_disco - assorbite)
+    return comparsi, spariti
+
+
+def conta_pagine(spec: str):
+    """Quante pagine dichiara «1-5,32,40». -1 se la dicitura non si legge.
+
+    Serve a rendere SOMMABILE cio' che finora stava in prosa nella nota: le note
+    dicevano «lette 1-5, 32 e 40» e nessuno poteva addizionarle.
+    """
+    if not spec:
+        return 0
+    if spec.strip().casefold() in ("non-paginato", "non paginato", "n.d.", "nd"):
+        return 0
+    n = 0
+    for pezzo in spec.replace(";", ",").split(","):
+        pezzo = pezzo.strip()
+        if not pezzo:
+            continue
+        m = re.fullmatch(r"(\d{1,6})\s*[-–]\s*(\d{1,6})", pezzo)
+        if m:
+            a, b = int(m.group(1)), int(m.group(2))
+            if b < a:
+                return -1
+            n += b - a + 1
+            continue
+        if pezzo.isdigit():
+            n += 1
+            continue
+        return -1
+    return n
+
+
+def copertura_in_pagine(S, pag):
+    """(pagine_lette, pagine_totali, senza_dichiarazione).
+
+    `pag` e' {percorso: n_pagine}, che le pagine le ha contate l'indice aprendo i
+    file. Un atto letto per intero vale tutte le sue pagine; uno letto in parte
+    vale quelle che ha dichiarato - e se non ne ha dichiarate nessuna, finisce nel
+    terzo numero, che e' un rilievo e non uno zero.
+    """
+    if not pag:
+        return 0, 0, []
+    lette = totali = 0
+    muti = []
+    for v in S["file"]:
+        if v.get("classe") != "ATTO":
+            continue
+        n = pag.get(v["percorso"], 0)
+        if not n and v.get("versione_ocr"):
+            # Una busta firmata non ha pagine: le ha il PDF che ne e' stato estratto,
+            # e il testo che si legge e' quello. Senza questo, il contenuto di
+            # quindici buste - meta' di un fascicolo di gara - non entrava nel
+            # denominatore delle pagine. Misurato il 6 settembre 2026 su Bottegone.
+            n = pag.get(v["versione_ocr"], 0)
+        if not n:
+            continue
+        totali += n
+        if v.get("lettura") == "LETTO":
+            lette += n
+        elif v.get("lettura") == "PARZIALE":
+            dichiarate = conta_pagine(v.get("pagine_lette", ""))
+            if dichiarate <= 0:
+                muti.append(v)
+            else:
+                lette += min(dichiarate, n)
+    return lette, totali, muti
+
+
+def pagine_da_indice(radice: Path):
+    """{percorso: n_pagine} dall'indice di commessa-rag, o {} se non c'e'."""
+    db = trova_indice(radice)
+    if not db:
+        return {}
+    try:
+        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        fuori = {r[0]: (r[1] or 0) for r in
+                 con.execute("SELECT path, n_pages FROM documents")}
+        con.close()
+        return fuori
+    except sqlite3.Error:
+        return {}
+
+
+def leggibilita_del_fascicolo(S, radice: Path):
+    """Gli atti il cui testo e' rumore: (non ancora guardati, gia' guardati).
+
+    Un testo italiano vero ha una quota alta di parole funzionali - di, e, il, la,
+    che, per - perche' sono quelle che tengono insieme le frasi. Un riconoscimento
+    fallito quella quota non ce l'ha. La soglia non giudica la qualita' del
+    documento: dice «qui la macchina non ha capito niente, guardaci tu».
+    """
+    try:
+        import leggibilita
+    except ImportError:
+        return [], [], []
+    db = trova_indice(radice)
+    if not db:
+        return [], [], []
+    try:
+        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        pagine = {}
+        for path, testo in con.execute(
+                "SELECT d.path, p.text FROM pages p JOIN documents d ON d.id=p.doc_id"):
+            pagine.setdefault(path, []).append(testo or "")
+        con.close()
+    except sqlite3.Error:
+        return [], [], []
+    da_guardare, guardati, dubbi = [], [], []
+    for v in S["file"]:
+        if v.get("classe") != "ATTO":
+            continue
+        testi = pagine.get(v["percorso"])
+        if not testi and v.get("versione_ocr"):
+            # Una busta firmata non ha pagine: il testo sta nel PDF che ne e'
+            # stato estratto. Senza questo, il cancello e' cieco proprio sugli
+            # atti che in una gara contano - meta' del fascicolo. Misurato il
+            # 6 settembre 2026 sul collaudo della filiera.
+            testi = pagine.get(v["versione_ocr"])
+        if not testi:
+            continue
+        quote = [q for q, _ in (leggibilita.leggibilita(t) for t in testi) if q is not None]
+        if not quote:
+            continue
+        media = sum(quote) / len(quote)
+        if max(quote) < leggibilita.SOGLIA_RUMORE:
+            (guardati if v.get("lettura") in ACQUISITE else da_guardare).append((v, media))
+        elif media < leggibilita.SOGLIA_PROSA:
+            dubbi.append((v, media))
+    return da_guardare, guardati, dubbi
+
+
+def cmd_censisci(a):
+    radice = Path(a.cartella).expanduser().resolve()
+    if not radice.is_dir():
+        sys.exit(f"ERRORE: '{radice}' non e' una cartella.")
+    suffisso = a.suffisso
+
+    trovati, derivati, ignorati, orfani = scandisci(radice, suffisso)
+
+    # I nomi servono a riconoscere le trascrizioni: si costruiscono prima, per
+    # poter guardare all'intero fascicolo mentre si classifica un file. Ogni
+    # nome tiene TUTTE le sue collocazioni: tenendone una sola, a parita' di
+    # nome vinceva l'ultima incontrata nella scansione, e in un fascicolo di
+    # contabilita' - dove ogni SAL ha il suo «Riepilogo.pdf» - l'aggancio
+    # finiva su un documento scelto dall'ordine del disco.
+    per_nome = {}
+    for p, rel in trovati:
+        try:
+            dimensione = p.stat().st_size
+        except OSError:
+            dimensione = -1
+        per_nome.setdefault(p.name, []).append((rel, dimensione))
+
+    voci = []
+    for i, (p, rel) in enumerate(sorted(trovati, key=lambda x: x[1]), 1):
+        ext = p.suffix.lower()
+        classe, riferimento = _classifica_file(p, rel, per_nome, radice)
+        if ext in CONTENITORI and derivati.get(rel):
+            # La busta e' stata APERTA: il contenuto e' li' accanto, agganciato
+            # come derivato. Continuare a chiederne l'apertura manderebbe il
+            # flusso in un giro chiuso - aprila, ricensisci, ancora da aprire -
+            # e la busta resta l'atto perche' li' sta la firma.
+            lettura = "DA_LEGGERE"
+        elif ext in CONTENITORI:
+            lettura = "DA_APRIRE"
+        elif ext in SENZA_TESTO:
+            lettura = "SENZA_TESTO"
+        elif classe == "ATTO":
+            lettura = "DA_LEGGERE"
+        else:
+            lettura = classe
+        voci.append({
+            "id": i, "percorso": rel, "cartella": str(Path(rel).parent),
+            "nome": p.name, "ext": ext, "byte": p.stat().st_size,
+            "senza_testo": ext in SENZA_TESTO,
+            "versione_ocr": derivati.get(rel, ""),
+            "classe": classe, "derivato_di": riferimento,
+            "duplicato_di": "", "altre_collocazioni": [],
+            "lettura": lettura,
+            "sintesi": "", "nota": "",
+        })
+
+    n_dup = trova_duplicati(voci, radice)
+
+    # Il censimento si rilancia: il Passo 1 lo prescrive due volte, per fargli
+    # riconoscere i PDF appena riconosciuti. Riscrivere il registro da zero
+    # cancellava allora TUTTE le letture gia' registrate - e le schede sono il
+    # lavoro piu' costoso dell'intera analisi. Spariva in silenzio, senza
+    # avviso e senza copia. Qui si riportano i campi che appartengono a chi ha
+    # lavorato: cosa ha letto, cosa ha scritto, cosa ha riclassificato a mano.
+    # La corrispondenza e' per PERCORSO, non per id: gli id si rinumerano.
+    f = stato_file(a.cartella)
+    f.parent.mkdir(parents=True, exist_ok=True)
+    ripresi, riclassificati = 0, 0
+    if f.exists():
+        try:
+            vecchie = {v["percorso"]: v for v in json.loads(f.read_text("utf-8"))["file"]}
+        except (OSError, ValueError, KeyError):
+            vecchie = {}
+        if vecchie:
+            salva(f.with_name(f.name + ".prima-del-censimento"),
+                  json.loads(f.read_text("utf-8")))
+        for v in voci:
+            p = vecchie.get(v["percorso"])
+            if not p:
+                continue
+            if p.get("lettura") in ACQUISITE:
+                v["lettura"] = p["lettura"]
+                v["sintesi"] = p.get("sintesi", "")
+                if p.get("letto_il"):
+                    v["letto_il"] = p["letto_il"]
+                # Le PAGINE dichiarate sono lavoro di chi ha letto, esattamente come
+                # la sintesi, e si riportano con essa. Misurato il 6 settembre 2026
+                # sul banco di Bottegone: il ricensimento annunciava «32 letture
+                # riportate» e intanto svuotava `pagine_lette` di 11 letture
+                # parziali. La copertura scendeva da 208/543 a 143/543 e si riapriva
+                # un BLOCCANTE diverso - e il ricensimento e' proprio il rimedio che
+                # il cancello suggerisce: il consiglio del cancello distruggeva il
+                # lavoro che il cancello pretende.
+                if p.get("pagine_lette"):
+                    v["pagine_lette"] = p["pagine_lette"]
+                ripresi += 1
+            elif p.get("sintesi"):
+                # Una sintesi scritta non si butta mai, nemmeno quando lo stato
+                # non e' piu' di lettura. Il travaso guardava il solo stato, e
+                # bastava un `classe --servizio` perche' al censimento
+                # successivo il testo della scheda sparisse: il contenuto era
+                # stato descritto da qualcuno, e di quel lavoro non restava
+                # traccia se non nel backup, per una generazione sola.
+                v["sintesi"] = p["sintesi"]
+                if p.get("letto_il"):
+                    v["letto_il"] = p["letto_il"]
+            if p.get("nota"):
+                v["nota"] = p["nota"]
+            # Una classe decisa a mano vince sulla ri-derivazione automatica,
+            # altrimenti ogni censimento disfarebbe il lavoro dell'utente.
+            if "riclassificato" in (p.get("nota") or ""):
+                v["classe"] = p.get("classe", v["classe"])
+                v["derivato_di"] = p.get("derivato_di", "")
+                # ...ma nemmeno qui si cancella una lettura acquisita. Chi ha
+                # spostato con --forza un documento gia' letto ha scelto di
+                # conservarne la lettura: il censimento successivo non deve
+                # disfare meta' di quella decisione.
+                if v["classe"] != "ATTO" and v["lettura"] not in ACQUISITE:
+                    v["lettura"] = v["classe"]
+                riclassificati += 1
+
+    S = {"radice": str(radice), "censito_il": datetime.now().isoformat(timespec="seconds"),
+         "totale": len(voci),
+         "totale_atti": sum(1 for v in voci if v["classe"] == "ATTO"),
+         "ignorati": ignorati, "file": voci}
+    salva(f, S)
+
+    per_ext = {}
+    for v in voci:
+        per_ext[v["ext"] or "(nessuna)"] = per_ext.get(v["ext"] or "(nessuna)", 0) + 1
+    n_atti = S["totale_atti"]
+    n_der = sum(1 for v in voci if v["classe"] == "DERIVATO")
+    n_srv = sum(1 for v in voci if v["classe"] == "SERVIZIO")
+    print(f"Radice  : {radice}")
+    print(f"CENSITI : {len(voci)} file, di cui")
+    print(f"  ATTI del fascicolo   {n_atti:4d}   <- il denominatore dell'analisi")
+    print(f"  derivati             {n_der:4d}   trascrizioni di atti gia' presenti")
+    if n_dup:
+        print(f"  duplicati            {n_dup:4d}   copie identiche di atti gia' contati")
+    print(f"  di servizio          {n_srv:4d}   script, backup, registri di lavoro")
+    for e, n in sorted(per_ext.items(), key=lambda x: -x[1])[:10]:
+        print(f"  {e:12s} {n:4d}")
+    if derivati:
+        print(f"  ({len(derivati)} versioni OCR riconosciute come derivate, non ricontate)")
+    if orfani:
+        print(f"  ({orfani} PDF riconosciuti SENZA l'originale: contati come atti,")
+        print("   perche' sono l'unica copia di quel documento)")
+    if ripresi or riclassificati:
+        print(f"  (registro precedente: {ripresi} letture e {riclassificati} riclassificazioni")
+        print(f"   riportate; copia in _inventario/copertura.json.prima-del-censimento)")
+    if n_der or n_srv:
+        print("  Derivati e file di servizio non pretendono una scheda di lettura, ma")
+        print("  restano nella tabella di copertura. Per spostarne uno:")
+        print("    copertura.py classe <cartella> <id> --atto|--servizio|--derivato")
+    if ignorati:
+        print(f"IGNORATI: {len(ignorati)} file di sistema")
+    print(f"\nStato   : {f}")
+    return 0
+
+
+# --------------------------------------------------------------- indice rag
+def trova_indice(radice: Path):
+    """L'indice di commessa-rag puo' stare in tre posti diversi a seconda che
+    il filesystem regga SQLite. Li proviamo nello stesso ordine del motore."""
+    candidati = [radice / ".commessa-rag" / "index.db"]
+    h = hashlib.sha1(str(radice).encode("utf-8")).hexdigest()[:16]
+    candidati.append(Path.home() / ".commessa-rag" / h / "index.db")
+    import tempfile
+    candidati.append(Path(tempfile.gettempdir()) / ".commessa-rag" / h / "index.db")
+    for c in candidati:
+        if c.exists():
+            return c
+    return None
+
+
+def leggi_indice(radice: Path):
+    """Restituisce {percorso: (stato, n_pagine, n_pagine_con_testo)} oppure None."""
+    db = trova_indice(radice)
+    if not db:
+        return None, None
+    try:
+        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        righe = con.execute("SELECT path, status, n_pages, n_text_pages FROM documents").fetchall()
+        con.close()
+    except sqlite3.Error as e:
+        return None, f"indice illeggibile: {e}"
+    # Cio' che scriviamo noi in _inventario non e' un atto della commessa: se
+    # finisce nell'indice diventa citabile, e il cancello sui virgolettati
+    # certifica come «verificata» una frase che abbiamo scritto noi. Il
+    # censimento gia' ignora quella cartella; qui si allinea la lettura.
+    return ({r[0]: (r[1], r[2], r[3]) for r in righe
+             if "_inventario" not in Path(r[0]).parts}, str(db))
+
+
+# --------------------------------------------------------------- stato
+def classifica(S, indice):
+    da_leggere, letti, parziali, esclusi, senza_testo = [], [], [], [], []
+    derivati, servizio = [], []
+    for v in S["file"]:
+        classe = v.get("classe", "ATTO")   # censimenti anteriori: tutto era atto
+        if classe in ("DERIVATO", "DUPLICATO"):
+            derivati.append(v)
+            continue
+        if classe in ("SERVIZIO", "PROPRIO"):
+            servizio.append(v)
+            continue
+        if v["lettura"] == "ESCLUSO":
+            esclusi.append(v)
+        elif v["lettura"] == "SENZA_TESTO":
+            senza_testo.append(v)
+        elif v["lettura"] == "LETTO":
+            letti.append(v)
+        elif v["lettura"] == "PARZIALE":
+            parziali.append(v)
+        else:
+            da_leggere.append(v)
+    non_indicizzati, pagine_perse, mute_dopo_ocr, attestati = [], [], [], []
+    if indice is not None:
+        # commessa-rag registra quante pagine ha un documento e quante ne hanno
+        # prodotto testo, ma il suo cancello guarda solo lo stato complessivo:
+        # basta una pagina leggibile perche' l'intero atto risulti verde. Il
+        # divario fra i due numeri e' proprio l'elenco delle pagine che nessuna
+        # ricerca potra' mai restituire - di norma le scansioni firmate.
+        #
+        # Con un'eccezione: una pagina rimasta muta DOPO il riconoscimento non
+        # e' una pagina da riconoscere, e' una pagina che testo non ne ha - le
+        # foto di una documentazione fotografica ne sono l'esempio ordinario.
+        # Trattarla come bloccante manderebbe il flusso in un giro chiuso (rifai
+        # l'OCR, reindicizza, ancora bloccante) su un fascicolo che e' a posto.
+        # Va detta, perche' resta contenuto non ricercabile, ma non sbarra.
+        # Se il riconoscimento sia stato fatto NON lo dice il nome del file. Il
+        # suffisso e' configurabile con --suffisso, e il censimento ha gia'
+        # scritto la mappa originale -> derivato usando quello davvero adoperato.
+        # Fidarsi del nome sbagliava nei due versi opposti, entrambi misurati il
+        # 4 settembre 2026:
+        #   - un fascicolo che arriva dal committente con le sue scansioni gia'
+        #     chiamate `*_OCR.pdf`, mai passate sotto alcun riconoscimento,
+        #     veniva assolto per il solo nome: un contratto di 12 pagine con 11
+        #     non ricercabili scendeva da BLOCCANTE ad AVVISO, e il cancello
+        #     poteva chiudere verde su un atto che nessuna ricerca pescherebbe;
+        #   - lavorando con un suffisso diverso, il PDF riconosciuto per davvero
+        #     non finiva per `_ocr.pdf` e il flusso restava nel giro chiuso che
+        #     il commento qui sopra dice di voler evitare - rifai l'OCR,
+        #     reindicizza, ancora bloccante - su un fascicolo a posto.
+        def normale(x):
+            return str(x).replace("/", "\\").lower()
+        nostri_ocr = {normale(v["versione_ocr"]) for v in S["file"] if v.get("versione_ocr")}
+        con_ocr_fatto = {normale(v["percorso"]) for v in S["file"] if v.get("versione_ocr")}
+        # ...e le pagine che l'integrita' ha MISURATO bianche non sono un guasto
+        # da riparare: da una pagina vuota l'OCR non puo' cavare nulla, e
+        # pretenderlo e' il giro chiuso di sempre con un passaggio in piu'.
+        # Misurato il 4 settembre 2026: l'ultimo bloccante di un fascicolo di
+        # lavori pubblici era un elaborato di 54 pagine di cui una - il retro
+        # non stampato - il motore contava come non ricercabile. Ed e' vero che
+        # non lo e': non c'e' niente da cercare.
+        bianche = {}
+        f_int = stato_file(S["radice"]).with_name("integrita.json")
+        if f_int.exists():
+            try:
+                for e in json.loads(f_int.read_text("utf-8")).get("file", []):
+                    quante = len(e.get("pagine_bianche") or []) + len(e.get("pagine_vuote") or [])
+                    if quante:
+                        bianche[normale(e["file"])] = quante
+            except (json.JSONDecodeError, OSError, KeyError):
+                bianche = {}
+        for percorso, (stato, n_pag, n_testo) in sorted(indice.items()):
+            if stato == "indexed" and n_pag and n_testo < n_pag:
+                p = normale(percorso)
+                gia_riconosciuto = p in nostri_ocr or p in con_ocr_fatto
+                tutte_bianche = (n_pag - n_testo) <= bianche.get(p, 0)
+                (mute_dopo_ocr if (gia_riconosciuto or tutte_bianche)
+                 else pagine_perse).append((percorso, n_pag, n_testo))
+        # Solo gli ATTI devono essere ricercabili. Che uno script Python non sia
+        # nell'indice non e' un guasto da riparare: e' come deve stare.
+        for v in S["file"]:
+            if v.get("classe", "ATTO") != "ATTO":
+                continue
+            if v["senza_testo"] or v["lettura"] == "ESCLUSO":
+                continue
+            candidati = [v["percorso"]] + ([v["versione_ocr"]] if v["versione_ocr"] else [])
+            # Vale la forma MIGLIORE fra l'originale e il suo gemello `_OCR`,
+            # non la prima che si incontra. Un atto acquisito a scanner resta
+            # `needs_ocr` nell'indice PER SEMPRE: il riconoscimento scrive un
+            # file NUOVO, e l'originale - che in un contenzioso e' la prova -
+            # non lo tocca nessuno. Prendendo il primo candidato si prendeva
+            # sempre l'originale, e un atto letto, schedato e ricercabile su
+            # tutte le sue pagine veniva dichiarato «NON nell'indice, nessuna
+            # ricerca potra' mai restituirlo» - frase che finiva pari pari nella
+            # tabella di copertura consegnata al cliente.
+            #
+            # E il rimedio che quel messaggio prescrive - rifai l'OCR e
+            # reindicizza - non puo' funzionare per costruzione: e' il giro
+            # chiuso che altrove in questo file si e' gia' dovuto spezzare.
+            stati = [indice[c][0] for c in candidati if c in indice]
+            stato = next((s for s in ("indexed", "attested") if s in stati),
+                         stati[0] if stati else None)
+            # 'attested' non e' un guasto: e' il rimedio che commessa-rag stesso
+            # prevede per cio' da cui non si ricava testo - una ricevuta PEC in
+            # XML, un allegato firmato - e vuol dire che qualcuno l'ha aperto e
+            # ne ha attestato il contenuto. Trattarlo come bloccante rimanderebbe
+            # a un'indicizzazione che non potra' mai riuscire. Va detto, perche'
+            # da un atto attestato non si cita fonte:pagina, ma non sbarra.
+            if stato == "attested":
+                attestati.append(v)
+            elif stato != "indexed":
+                non_indicizzati.append((v, stato or "assente dall'indice"))
+    return (da_leggere, letti, parziali, esclusi, senza_testo,
+            non_indicizzati, pagine_perse, mute_dopo_ocr, derivati, servizio,
+            attestati)
+
+
+def cmd_stato(a):
+    f, S = carica(a.cartella)
+    radice = Path(S["radice"])
+    indice, dove = leggi_indice(radice)
+    indice_pagine = pagine_da_indice(radice)
+    (da_l, letti, parz, escl, senza, non_idx, perse, mute_ocr,
+     deriv, srv, attest) = classifica(S, indice)
+    # Il denominatore sono gli ATTI: e' su quelli che si misura la copertura di
+    # un'analisi documentale. Derivati e file di servizio restano scritti sopra,
+    # perche' chi legge deve vedere anche cio' che e' stato messo da parte.
+    tot = len(da_l) + len(letti) + len(parz) + len(escl) + len(senza)
+    coperti = len(letti) + len(parz) + len(escl) + len(senza)
+    perc = 100.0 * coperti / tot if tot else 100.0
+
+    n_dup = sum(1 for v in deriv if v.get("classe") == "DUPLICATO")
+    print(f"FILE nella cartella e sottocartelle     : {S['totale']}")
+    print(f"  derivati (trascrizioni di atti)       : {len(deriv) - n_dup}")
+    if n_dup:
+        print(f"  duplicati (copie identiche)           : {n_dup}")
+    n_propri = sum(1 for v in srv if v.get("classe") == "PROPRIO")
+    print(f"  di servizio (script, backup, registri): {len(srv) - n_propri}")
+    if n_propri:
+        print(f"  NOSTRI elaborati (non sono atti)      : {n_propri}")
+    print(f"ATTI DEL FASCICOLO                     : {tot}   <- il denominatore")
+    if indice is None:
+        print(f"INDICIZZATI da commessa-rag            : indice non trovato"
+              f"{' - ' + dove if dove else ''}")
+        print("  (eseguire: rag.py init && rag.py index, poi ripetere)")
+    else:
+        print(f"INDICIZZATI da commessa-rag            : {len(indice)}"
+              f"   [{dove}]")
+    print(f"LETTI uno per uno                      : {len(letti)}")
+    print(f"  letti parzialmente (motivati)         : {len(parz)}")
+    print(f"  senza testo (grafici e CAD)           : {len(senza)}")
+    print(f"  esclusi con motivazione               : {len(escl)}")
+    print(f"  DA LEGGERE                            : {len(da_l)}")
+    print(f"\nCOPERTURA DI LETTURA: {coperti}/{tot} = {perc:.1f}%  (documenti)")
+    p_lette, p_tot, p_muti = copertura_in_pagine(S, indice_pagine)
+    if p_tot:
+        minimo = "  (MINIMO)" if p_muti else ""
+        print(f"COPERTURA IN PAGINE : {p_lette}/{p_tot} = "
+              f"{100.0*p_lette/p_tot:.1f}%{minimo}  <- quanto fascicolo e' stato guardato")
+        if p_muti:
+            print(f"  E' un minimo, non una misura: {len(p_muti)} atti letti in parte non")
+            print("  dichiarano quali pagine, e qui contano zero. La copertura vera sta")
+            print("  fra questo numero e quello che si otterrebbe dichiarandole.")
+        elif p_lette < p_tot:
+            print("  Le due misure rispondono a domande diverse: la prima dice quanti")
+            print("  atti sono stati aperti, la seconda quanta carta e' stata letta.")
+
+    problemi = False
+    comparsi, spariti = deriva_dal_censimento(S, radice)
+    if comparsi:
+        problemi = True
+        print(f"\nBLOCCANTE - {len(comparsi)} file sono COMPARSI dopo il censimento:")
+        for rel in comparsi[:25]:
+            print(f"  {rel}")
+        if len(comparsi) > 25:
+            print(f"  ... e altri {len(comparsi)-25}")
+        print("  Non sono nel registro, quindi nessuno li ha letti e nessun numero")
+        print("  di questa pagina li conta: la copertura qui sopra NON li riguarda.")
+        print("  Risolvere con: copertura.py censisci <cartella>")
+        print("  (il ricensimento conserva le schede gia' scritte)")
+    if spariti:
+        problemi = True
+        print(f"\nBLOCCANTE - {len(spariti)} file del registro NON sono piu' sul disco:")
+        for rel in spariti[:25]:
+            print(f"  {rel}")
+        if len(spariti) > 25:
+            print(f"  ... e altri {len(spariti)-25}")
+        print("  Le loro schede parlano di documenti che non si possono piu' aprire:")
+        print("  o si ripristinano i file, o si ricensisce dichiarando che non ci sono.")
+    # Senza indice, quattro controlli su cinque non sono stati eseguiti: gli
+    # atti assenti dall'indice, quelli indicizzati solo in parte, le pagine
+    # mute e gli attestati. Uscire 0 significherebbe far leggere «verifica non
+    # eseguita» come «verifica superata» - e l'agente di verifica-consegna usa
+    # proprio questo codice di uscita come primo controllo.
+    if indice is None:
+        problemi = True
+        print("\nBLOCCANTE - indice di commessa-rag non trovato o illeggibile.")
+        print("  I controlli su atti assenti dall'indice, su documenti")
+        print("  indicizzati solo in parte e sulle pagine non ricercabili")
+        print("  NON SONO STATI ESEGUITI: questo esito non dice nulla sulla")
+        print("  ricercabilita' del fascicolo.")
+        print("  Eseguire: rag.py init && rag.py index, poi ripetere.")
+    if perse:
+        problemi = True
+        print(f"\nBLOCCANTE - {len(perse)} documenti indicizzati solo IN PARTE:")
+        for percorso, n_pag, n_testo in perse[:25]:
+            spiega = ("pagine acquisite a scanner dentro un PDF altrimenti leggibile"
+                      if percorso.lower().endswith(".pdf")
+                      else "parti del documento prive di testo")
+            print(f"  {percorso}")
+            print(f"      {n_pag - n_testo} su {n_pag} non ricercabili: {spiega}")
+        if len(perse) > 25:
+            print(f"  ... e altri {len(perse)-25}")
+        print("  L'indice li da' per buoni: il suo stato guarda il documento, non le pagine.")
+        print("  Risolvere con integrita.py (OCR sulle pagine mute) e reindicizzare.")
+    if mute_ocr:
+        print(f"\nAVVISO - {len(mute_ocr)} documenti con pagine mute ANCHE dopo il riconoscimento:")
+        for percorso, n_pag, n_testo in mute_ocr[:25]:
+            print(f"  {percorso}")
+            print(f"      {n_pag - n_testo} su {n_pag}: pagine che testo non ne hanno")
+            print(f"      (di norma documentazione fotografica). Rifare l'OCR non serve.")
+        if len(mute_ocr) > 25:
+            print(f"  ... e altri {len(mute_ocr)-25}")
+        print("  NON blocca, ma quelle pagine restano fuori da ogni ricerca:")
+        print("  se contano per l'analisi, vanno guardate a occhio e descritte nella scheda.")
+    # --- il quarto cancello: cio' che la macchina non ha capito
+    muti, muti_letti, dubbi = leggibilita_del_fascicolo(S, radice)
+    if muti:
+        problemi = True
+        print(f"\nBLOCCANTE - {len(muti)} atti hanno TESTO CHE NON VUOL DIRE NIENTE,")
+        print("  e nessuno li ha ancora guardati:")
+        for v, quota in muti[:25]:
+            print(f"  #{v['id']} [{quota:.0%} di lingua] {v['percorso']}")
+        if len(muti) > 25:
+            print(f"  ... e altri {len(muti)-25}")
+        print("  Il testo c'e' - quindi l'indice li da' per buoni - ma e' rumore:")
+        print("  di norma un manoscritto, una scansione mal riconosciuta, o una tavola.")
+        print("  Nessuna ricerca li restituira'. Si guardano a vista e si registrano:")
+        print("    sguardo.py \"<atto.pdf>\"     poi si aprono le immagini con Read")
+        print("  e la lettura si registra con `letto` o si esclude motivando.")
+    if dubbi:
+        print(f"\nAVVISO - {len(dubbi)} atti che NON sono prosa: cartigli, elenchi, tabelle.")
+        for v, quota in dubbi[:15]:
+            print(f"  [{quota:.0%} di lingua] {v['percorso']}")
+        if len(dubbi) > 15:
+            print(f"  ... e altri {len(dubbi)-15}")
+        print("  Il testo estratto c'e' e non e' rumore, ma non e' un discorso:")
+        print("  su questi si GUARDA la pagina invece di leggerne il testo, e cio'")
+        print("  che si afferma si prende dall'immagine. Misurato su un fascicolo")
+        print("  di gara: la prosa sta fra il 25 e il 38%, i cartigli fra il 10 e il 20%.")
+    if muti_letti:
+        print(f"\nAVVISO - {len(muti_letti)} atti letti a vista, il cui testo resta rumore:")
+        for v, quota in muti_letti[:25]:
+            print(f"  #{v['id']} {v['percorso']}")
+        if len(muti_letti) > 25:
+            print(f"  ... e altri {len(muti_letti)-25}")
+        print("  Da questi NON si cita fonte:pagina: l'indice non ha nulla da restituire.")
+        print("  Vale cio' che ha visto chi li ha guardati, e va detto nella relazione.")
+    if attest:
+        print(f"\nAVVISO - {len(attest)} atti acquisiti per attestazione, non per estrazione:")
+        for v in attest[:25]:
+            print(f"  {v['percorso']}")
+        if len(attest) > 25:
+            print(f"  ... e altri {len(attest)-25}")
+        print("  Da questi NON si cita fonte:pagina: vale l'attestazione di chi li ha aperti.")
+    if non_idx:
+        problemi = True
+        print(f"\nBLOCCANTE - {len(non_idx)} documenti censiti ma NON nell'indice:")
+        for v, st in non_idx[:25]:
+            print(f"  [{st}] {v['percorso']}")
+        if len(non_idx) > 25:
+            print(f"  ... e altri {len(non_idx)-25}")
+        print("  Sono atti che nessuna ricerca potra' mai restituire.")
+        print("  Risolvere con integrita.py (OCR) e rag.py index, oppure escludere motivando.")
+    if p_muti:
+        problemi = True
+        print(f"\nBLOCCANTE - {len(p_muti)} atti letti in parte NON dichiarano quali pagine:")
+        for v in p_muti[:25]:
+            print(f"  #{v['id']} {v['percorso']}")
+        if len(p_muti) > 25:
+            print(f"  ... e altri {len(p_muti)-25}")
+        print("  Senza le pagine, la copertura in pagine non e' calcolabile e la")
+        print("  lettura parziale non e' verificabile da nessuno.")
+        print("  Dichiararle con: copertura.py pagine <cartella> <id> --pagine \"1-5,32,40\"")
+    if da_l:
+        problemi = True
+        print(f"\nBLOCCANTE - {len(da_l)} documenti non ancora letti.")
+        print("  Elencarli con: copertura.py da-leggere <cartella>")
+        n_cont = sum(1 for v in da_l if v["ext"] in CONTENITORI)
+        if n_cont:
+            print(f"  Di questi, {n_cont} sono CONTENITORI (.p7m, .zip, .rar, .7z)")
+            print("  mai aperti: dentro ci sono atti che nessuno ha visto. Estrarre")
+            print("  il contenuto nella cartella e rieseguire 'censisci', oppure")
+            print("  aprirli e attestarli, oppure escluderli motivando.")
+    if problemi:
+        print("\nESITO: fascicolo NON coperto. Non chiudere l'analisi in questo stato.")
+        return 1
+    print("\nESITO: copertura completa. L'analisi puo' essere consegnata.")
+    return 0
+
+
+def cmd_da_leggere(a):
+    f, S = carica(a.cartella)
+    indice, _ = leggi_indice(Path(S["radice"]))
+    # Anche i contenitori: il cancello dice «elencarli con da-leggere», e
+    # rispondere «nessun documento in attesa» smentirebbe il cancello stesso.
+    da_l = [v for v in S["file"] if v["lettura"] in ("DA_LEGGERE", "DA_APRIRE")]
+    if a.cartella_filtro:
+        da_l = [v for v in da_l if v["cartella"].startswith(a.cartella_filtro)]
+    if not da_l:
+        print("Nessun documento in attesa di lettura.")
+        return 0
+    print(f"{len(da_l)} da leggere. Prossimi {min(a.limite, len(da_l))}:\n")
+    for v in da_l[:a.limite]:
+        rif = v["versione_ocr"] or v["percorso"]
+        pag = ""
+        if indice and rif in indice:
+            pag = f", {indice[rif][2]}/{indice[rif][1]} pagine con testo"
+        print(f"#{v['id']:4d}  {v['percorso']}{pag}")
+        if v["versione_ocr"]:
+            print(f"        (leggere la versione OCR: {v['versione_ocr']})")
+    print("\nIl testo si ottiene da: rag.py page --folder <cartella> --file <rel> --pagina <n>")
+    return 0
+
+
+# Le tre lettere con cui comincia quasi ogni sequenza di mojibake italiano:
+# sono il primo byte di una lettera accentata UTF-8 letta come se fosse una
+# codifica a un byte sola.
+SPIE_MOJIBAKE = "ÃÂâ"
+
+
+def ripara_mojibake(s: str) -> str:
+    """Rimette in piedi una stringa UTF-8 che e' passata per una codifica a un byte.
+
+    Il guasto non nasce qui: nasce nel lettore, che chiede il testo a `rag.py`
+    attraverso una shell e ne raccoglie l'uscita con la codifica sbagliata. Non
+    posso correggere la shell di ogni agente, ma posso non lasciar entrare nel
+    registro una scheda illeggibile - e sono schede che finiscono in documenti
+    che escono. Visto su due fascicoli veri di natura diversa, il che dice che
+    non e' un incidente isolato.
+
+    Le codifiche si provano in quest'ordine perche' su Windows la colpevole e'
+    quasi sempre cp1252, e le due si somigliano abbastanza da confondersi: e'
+    cp1252 che rende la sommatoria come «a` con accento circonflesso e
+    virgoletta», dove latin-1 lascerebbe caratteri di controllo. Averle
+    scambiate, la prima volta, ha fatto passare per sana una riparazione che
+    non riparava nulla.
+
+    Si ripara solo se il giro d'andata e ritorno riesce, non produce caratteri
+    di sostituzione E lascia meno spie di prima: un testo che contiene quelle
+    lettere per ragioni sue resta com'e'.
+    """
+    prima = sum(s.count(c) for c in SPIE_MOJIBAKE)
+    if not prima:
+        return s
+    for codifica in ("cp1252", "latin-1"):
+        try:
+            dopo = s.encode(codifica).decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            continue
+        if "�" in dopo:
+            continue
+        if sum(dopo.count(c) for c in SPIE_MOJIBAKE) < prima:
+            return dopo
+    return s
+
+
+def _registra(S, id_, modo, sintesi, motivo="", completata=False):
+    sintesi, motivo = ripara_mojibake(sintesi), ripara_mojibake(motivo)
+    for v in S["file"]:
+        if v["id"] == id_:
+            # Un contenitore non si chiude con una scheda. Il cancello indica
+            # due vie - estrarre o attestare - e la seconda, seguita alla
+            # lettera, portava a «copertura completa» con dodici SAL dentro un
+            # archivio mai censito: una scheda sull'involucro certificava il
+            # contenuto. Si estrae e si ricensisce, oppure lo si esclude
+            # motivando, che e' una decisione dell'utente e resta scritta.
+            # ...ma una busta GIA' APERTA si registra come letta: il contenuto e'
+            # accanto, agganciato, ed e' da li' che si e' letto. Il divieto
+            # valeva anche a busta aperta, e metteva chi legge davanti a tre vie
+            # tutte storte. Misurato il 5 settembre 2026 su un fascicolo di
+            # gara, dove tre lettori veri hanno scelto tre strade diverse:
+            # uno ha lasciato quattro atti non registrati e l'ha detto - la
+            # scelta migliore - e due hanno usato `escludi` scrivendo la sintesi
+            # nel motivo, per non perdere il lavoro fatto. Cosi' pero' il
+            # registro segnava «esclusi: 5» su atti che erano stati letti per
+            # intero, e chi lo guarda legge il contrario del vero.
+            if (v.get("ext") in CONTENITORI and modo != "ESCLUSO"
+                    and not v.get("versione_ocr")):
+                return (f"#{id_} {v['nome']} e' un CONTENITORE ancora chiuso: non si registra "
+                        f"come letto. Estrarne il contenuto nella cartella e rieseguire "
+                        f"'censisci', oppure escluderlo con 'escludi' motivando.")
+            # Una lettura PARZIALE non diventa integrale per il fatto che qualcuno
+            # ne riscrive la scheda. Il caso non e' teorico ed e' il modo normale
+            # in cui accade: si manda un lettore a CORREGGERE una scheda bocciata
+            # dall'ancoraggio, quello riscrive la sintesi con `letto` - il comando
+            # ovvio - e il campo `pagine_lette` si azzera qui sotto, giustamente,
+            # perche' per un LETTO vale l'atto intero. Solo che nessuno ha letto
+            # una pagina in piu'. Misurato il 7 settembre 2026 su Fosso Venacone,
+            # su una relazione di 348 pagine con 63 dichiarate, e riprodotto in
+            # isolamento su due soli PDF: copertura in pagine da 29,4% a 100,0%
+            # con un comando, e l'unica uscita era «Registrati 1 documenti».
+            # Nessun cancello lo vede, e non potrebbe: un numero piu' alto
+            # somiglia a un progresso, non a un difetto.
+            # Chi completa davvero la lettura lo dice, come chi la dichiara
+            # parziale deve dire quali pagine: quella e' la simmetria giusta.
+            if (modo == "LETTO" and v.get("lettura") == "PARZIALE"
+                    and v.get("pagine_lette") and not completata):
+                return (f"#{id_} {v['nome']} e' registrato come lettura PARZIALE, con queste "
+                        f"pagine dichiarate: {v['pagine_lette']}. Registrarlo come LETTO le "
+                        f"cancella e fa contare l'atto INTERO nella copertura, senza che "
+                        f"nessuno abbia letto altro. Due strade, e sono diverse:\n"
+                        f"     - stai correggendo la scheda, non hai letto altre pagine:\n"
+                        f"         copertura.py parziale <cartella> {id_} --sintesi \"...\" "
+                        f"--motivo \"...\" --pagine \"{v['pagine_lette']}\"\n"
+                        f"     - hai davvero finito di leggere l'atto per intero:\n"
+                        f"         copertura.py letto <cartella> {id_} --sintesi \"...\" "
+                        f"--completata")
+            v["lettura"] = modo
+            v["sintesi"] = sintesi.strip()
+            v["letto_il"] = datetime.now().isoformat(timespec="seconds")
+            # `pagine_lette` appartiene alla lettura PARZIALE, e a nessun'altra:
+            # e' il campo che dice quali pagine, delle molte, sono state guardate.
+            # Su una lettura completa non vuol dire niente, e lasciarcelo dice
+            # anzi il falso. Misurato il 7 settembre 2026 su Agrorinasce,
+            # completando l'oGI BIM: la scheda passava a LETTO - e la copertura
+            # contava giustamente tutte e 60 le pagine - ma il campo continuava a
+            # portare «1-6,24-25,35-36,55-60», cioe' le 16 della lettura di prima.
+            # Chi avesse riletto quel registro avrebbe creduto guardate 16 pagine
+            # su un atto letto per intero. E' lo stesso difetto della `nota` qui
+            # sotto, sopravvissuto su un campo diverso: un residuo della lettura
+            # precedente che contraddice quella corrente.
+            if modo != "PARZIALE":
+                v["pagine_lette"] = ""
+            # La nota appartiene alla lettura CORRENTE, esattamente come
+            # `sintesi` e `letto_il`: registrarne una nuova la SOSTITUISCE, non
+            # le si accoda. Prima le si accodava sempre, e dopo due letture
+            # dello stesso atto la scheda portava due motivazioni attaccate da
+            # un punto e virgola, riferite a letture diverse e in parte
+            # contraddittorie - misurato il 06-09-2026 sul capitolato del banco,
+            # dove la prima diceva «non estesa agli articoli 3-48» e la seconda
+            # «un articolo campione per ciascuna partizione». Chi legge la
+            # scheda non sa quale delle due valga, e il rapporto le stampa
+            # entrambe.
+            #
+            # E' lo stesso difetto gia' corretto il 05-09-2026 su ALATRI, dove
+            # promuovere un atto da PARZIALE a LETTO gli lasciava addosso la
+            # motivazione della lettura parziale - «non lette a tappeto» - e la
+            # scheda diceva «LETTO PER INTERO» mentre la nota diceva il
+            # contrario. Allora si azzero' la nota per quel solo passaggio; qui
+            # quel caso particolare sparisce, perche' la regola vale per ogni
+            # rilettura, promozione o no.
+            #
+            # Si conservano pero' le note di RICLASSIFICAZIONE: non descrivono
+            # una lettura ma la classe del documento, le scrive un altro
+            # comando, e il travaso del censimento le rilegge (cerca
+            # «riclassificato» per non disfare una classe decisa a mano).
+            resta = [t.strip() for t in re.split(r";\s+", v.get("nota") or "")
+                     if t.strip().startswith("riclassificato")]
+            v["nota"] = "; ".join(resta + ([motivo] if motivo else []))
+            return None
+    return f"id #{id_} inesistente"
+
+
+def cmd_letto(a):
+    # Lo stdin si legge PRIMA di prendere il lock: aspettare un flusso in
+    # arrivo tenendo fermo il registro terrebbe in coda gli altri lettori per
+    # tutto il tempo, e su un fascicolo grande sono minuti.
+    voci, errori = [], []
+    if a.da_stdin:
+        for riga in sys.stdin:
+            riga = riga.strip()
+            if not riga:
+                continue
+            try:
+                d = json.loads(riga)
+            except json.JSONDecodeError as e:
+                errori.append(f"riga non valida ({e}): {riga[:60]}"); continue
+            if not d.get("sintesi"):
+                errori.append(f"#{d.get('id')}: sintesi mancante, non registrato"); continue
+            # `completata` si dichiara anche riga per riga: un lotto in stdin puo'
+            # contenere insieme schede nuove e il completamento di una lettura
+            # lasciata a meta', e un flag unico per tutto il lotto costringerebbe
+            # ad alzarlo per tutti - cioe' a spegnere il presidio per rialzarne uno.
+            voci.append((int(d["id"]), d.get("modo", "LETTO"), d["sintesi"],
+                         d.get("motivo", ""), bool(d.get("completata", False))))
+    else:
+        if not a.sintesi:
+            sys.exit("ERRORE: serve --sintesi. Una riga su cosa contiene il documento: e'\n"
+                     "la prova che e' stato aperto e non soltanto elencato.")
+        voci = [(i, "LETTO", a.sintesi, "", bool(getattr(a, "completata", False)))
+                for i in a.id]
+
+    n = 0
+    with stato_esclusivo(a.cartella) as (f, S):
+        for id_, modo, sintesi, motivo, completata in voci:
+            e = _registra(S, id_, modo, sintesi, motivo, completata)
+            if e:
+                errori.append(e)
+            else:
+                n += 1
+    # Ogni conferma di scrittura NOMINA il fascicolo. Misurato il 4 settembre
+    # 2026 con i lettori veri: uno di essi, invece di usare la cartella che gli
+    # era stata data, ha cercato `copertura.json` nel filesystem, ne ha trovate
+    # molte - le copie di collaudo - e ha scelto quella di UN'ALTRA commessa,
+    # «verificando» che contenesse gli id assegnati: vero, perche' una era la
+    # copia dell'altra. Ha registrato 14 schede nel fascicolo sbagliato e ha
+    # riferito in buona fede di averle registrate, perche' il comando diceva
+    # «Registrati 14 documenti» e nient'altro. Con il percorso stampato,
+    # l'errore si vede nella riga stessa che lo commette.
+    print(f"Registrati {n} documenti come letti in {Path(S['radice']).name}.")
+    print(f"  ({S['radice']})")
+    for e in errori:
+        print("  ATTENZIONE: " + e)
+    return 1 if errori else 0
+
+
+RIPRODUZIONE_AFFERMATA = (
+    "riproduc", "gia letto", "gia letta", "gia lette", "gia letti",
+    "copia di", "copia del", "copia della", "e copia", "identic",
+    "duplicat", "stesso testo", "medesimo testo", "stesso contenuto",
+    "medesimo contenuto", "gia presente", "gia acquisit", "gia visto",
+    "riportato in", "riportata in", "si ritrova in", "coincide con",
+)
+
+
+def _motivo_afferma_riproduzione(motivo: str) -> bool:
+    """Il motivo sostiene che il contenuto sta gia' altrove?
+
+    Non e' un giudizio sulla qualita' del motivo: e' il riconoscimento di
+    un'AFFERMAZIONE, che in quanto tale va provata. «Ho letto solo le tabelle di
+    bilancio» non dice nulla del resto ed e' una scelta; «riproduce il parere
+    627» dice che il resto e' gia' noto, ed e' una tesi.
+    """
+    if not motivo:
+        return False
+    t = unicodedata.normalize("NFKD", motivo)
+    t = "".join(c for c in t if not unicodedata.combining(c)).casefold()
+    # Gli apostrofi vanno tolti prima del confronto: senza, «gia' letto» non
+    # combaciava con la spia «gia letto» e passava liscio. E' la forma che i
+    # lettori usano piu' spesso, perche' il plugin vieta le lettere accentate.
+    t = re.sub(r"[\u0027\u2019\u02bc`]+", "", t)
+    t = re.sub(r"\s+", " ", t)
+    return any(spia in t for spia in RIPRODUZIONE_AFFERMATA)
+
+
+def cmd_parziale(a):
+    quante = conta_pagine(a.pagine)
+    if quante < 0:
+        sys.exit(f"ERRORE: --pagine \"{a.pagine}\" non si legge. Attese pagine e "
+                 f"intervalli separati da virgola: \"1-5,32,40\". Per un documento "
+                 f"senza pagine (foglio di calcolo, e-mail): \"non-paginato\".")
+
+    # Una lettura parziale salta delle pagine per due ragioni diverse, e una
+    # sola delle due e' un'affermazione sul loro contenuto. Misurato su
+    # Caltagirone il 10 settembre 2026: il D.D.G. 3/2024 fu registrato con
+    # motivo «riproduce il parere 627, gia' letto» e ventuno pagine restarono
+    # fuori. Contenevano i pareri CTS 350/2023 e 526/2023, che non esistono in
+    # nessun altro punto del fascicolo, e da li' e' uscito il riscontro sulla
+    # CA 4 lett. i). La motivazione era prosa, e la prosa non si controlla.
+    causa = (getattr(a, "causa", None) or "").strip().upper()
+    if not causa and _motivo_afferma_riproduzione(a.motivo):
+        sys.exit(
+            "ERRORE: il motivo afferma che il contenuto sta gia' in un altro atto,\n"
+            "ma non lo dichiara in forma verificabile, e cosi' nessuno puo' controllarlo.\n"
+            f"  motivo: «{a.motivo}»\n"
+            "  Se e' davvero una riproduzione, dichiararla e farla verificare:\n"
+            "    --causa RIPRODUCE --riproduce \"<percorso dell'atto gia' letto>\"\n"
+            "  Se invece la lettura e' stata mirata e sul resto non si afferma nulla:\n"
+            "    --causa MIRATA\n"
+            "  (Caltagirone, D.D.G. 3/2024: ventuno pagine date per copia del parere\n"
+            "  627 contenevano i pareri 350/2023 e 526/2023, unici nel fascicolo.)")
+    if not causa:
+        causa = "MIRATA"
+    if causa not in ("MIRATA", "RIPRODUCE", "ILLEGGIBILE"):
+        sys.exit(f"ERRORE: --causa \"{a.causa}\" non ammessa. "
+                 f"Ammesse: MIRATA, RIPRODUCE, ILLEGGIBILE.")
+    riferimenti = list(getattr(a, "riproduce", None) or [])
+    if causa == "RIPRODUCE" and not riferimenti:
+        sys.exit("ERRORE: --causa RIPRODUCE richiede --riproduce \"<percorso dell'atto "
+                 "gia' letto>\": senza, non c'e' nulla con cui confrontare.")
+
+    # Il rifiuto non si solleva dentro il lock: si annota e si esce dopo, cosi'
+    # il registro non viene toccato da una registrazione che non si fara'.
+    rifiuto = None
+    radice = ""
+    with stato_esclusivo(a.cartella) as (f, S):
+        radice = S["radice"]
+        if causa == "RIPRODUCE":
+            try:
+                import parziali_confronto
+            except ImportError:
+                rifiuto = ("ERRORE: parziali_confronto.py non e' accanto a copertura.py.\n"
+                           "  Senza il confronto, «riproduce un atto gia' letto» resterebbe\n"
+                           "  un'affermazione non verificata: la registrazione non si fa.\n"
+                           "  Un verificatore mancante non e' un lasciapassare.")
+            else:
+                percorso = next((v["percorso"] for v in S["file"] if v["id"] == a.id), None)
+                if percorso is None:
+                    rifiuto = f"id #{a.id} inesistente"
+                else:
+                    esito = parziali_confronto.confronta(
+                        Path(radice), percorso, a.pagine, riferimenti)
+                    if not esito["regge"]:
+                        rifiuto = parziali_confronto.spiega(
+                            esito, percorso, ", ".join(riferimenti))
+        if rifiuto is None:
+            e = _registra(S, a.id, "PARZIALE", a.sintesi, f"lettura parziale: {a.motivo}")
+            if e:
+                rifiuto = e
+            else:
+                for v in S["file"]:
+                    if v["id"] == a.id:
+                        v["pagine_lette"] = a.pagine
+                        v["causa_parziale"] = causa
+                        if causa == "RIPRODUCE":
+                            v["riproduce"] = riferimenti
+                        else:
+                            v.pop("riproduce", None)
+                        break
+    if rifiuto:
+        sys.exit(rifiuto)
+    print(f"#{a.id} registrato come letto parzialmente in {Path(radice).name}"
+          f" ({quante} pagine dichiarate, causa {causa}).")
+    if causa == "RIPRODUCE":
+        print(f"  confronto superato: le pagine non lette si ritrovano in "
+              f"{', '.join(riferimenti)}")
+    print(f"  ({radice})")
+    return 0
+
+
+def cmd_pagine(a):
+    """Dichiara a posteriori quali pagine sono state lette, senza riscrivere la scheda.
+
+    Serve per i fascicoli lavorati prima che la dichiarazione fosse obbligatoria: la
+    scheda c'e' ed e' buona, manca solo il dato che rende sommabile la lettura.
+    """
+    quante = conta_pagine(a.pagine)
+    if quante < 0:
+        sys.exit(f"ERRORE: --pagine \"{a.pagine}\" non si legge. Attese pagine e "
+                 f"intervalli separati da virgola: \"1-5,32,40\".")
+    with stato_esclusivo(a.cartella) as (f, S):
+        for v in S["file"]:
+            if v["id"] == a.id:
+                if v.get("lettura") != "PARZIALE":
+                    sys.exit(f"#{a.id} non e' una lettura parziale: e' {v.get('lettura')}. "
+                             f"Le pagine si dichiarano sulle letture parziali.")
+                v["pagine_lette"] = a.pagine
+                nome = v["percorso"]
+                break
+        else:
+            sys.exit(f"id #{a.id} inesistente")
+    print(f"#{a.id} {nome}: dichiarate {quante} pagine ({a.pagine}).")
+    return 0
+
+
+def cmd_escludi(a):
+    with stato_esclusivo(a.cartella) as (f, S):
+        S_radice = S["radice"]
+        for i in a.id:
+            e = _registra(S, i, "ESCLUSO", f"ESCLUSO: {a.motivo}")
+            if e:
+                print("  ATTENZIONE: " + e)
+    print(f"Esclusi {len(a.id)} documenti in {Path(S_radice).name}; la motivazione "
+          f"comparira' nella tabella di copertura.")
+    print(f"  ({S_radice})")
+    return 0
+
+
+def cmd_classe(a):
+    """Sposta un documento fra le tre classi.
+
+    La classificazione automatica e' prudente per costruzione - nel dubbio
+    lascia un file fra gli atti - e quindi sbaglia soprattutto per eccesso.
+    Questo comando e' il modo di correggerla senza toccare il censimento, e
+    ogni spostamento resta scritto nella nota, cosi' che nella tabella di
+    copertura si veda chi ha deciso cosa.
+    """
+    nuova = ("ATTO" if a.atto else "SERVIZIO" if a.servizio
+             else "PROPRIO" if getattr(a, "proprio", False) else "DERIVATO")
+    if nuova == "DERIVATO" and not a.di:
+        sys.exit("ERRORE: un derivato e' derivato DA qualcosa. Indicarlo con --di <percorso>.")
+    mossi, ignoti, protetti = 0, [], []
+    with stato_esclusivo(a.cartella) as (f, S):
+        S_radice = S["radice"]
+        for i in a.id:
+            v = next((x for x in S["file"] if x["id"] == i), None)
+            if v is None:
+                ignoti.append(i); continue
+            # Una lettura gia' fatta non si riscrive di soppiatto. Misurato il
+            # 4 settembre 2026: un atto letto e riassunto, spostato a
+            # --servizio, perdeva lo stato LETTO; lo strumento stampava
+            # «Riclassificati 1 documenti» e nient'altro, la copertura restava
+            # al 100%, e al PRIMO ricensimento - operazione di routine - anche
+            # la sintesi veniva azzerata, perche' il travaso conserva solo cio'
+            # che risulta letto. Un contenuto descritto spariva senza che un
+            # solo numero lo segnalasse. Nella direzione opposta bastava un
+            # `--atto` che non cambiava nulla per riportare a DA_LEGGERE una
+            # lettura fatta e rimettere il fascicolo in blocco.
+            if v["lettura"] in ACQUISITE and not a.forza:
+                protetti.append((i, v["lettura"], v["percorso"]))
+                continue
+            prima = v.get("classe", "ATTO")
+            v["classe"] = nuova
+            v["derivato_di"] = a.di if nuova == "DERIVATO" else ""
+            conserva = v["lettura"] in ACQUISITE
+            if not conserva:
+                v["lettura"] = ("SENZA_TESTO" if v["senza_testo"] else "DA_LEGGERE") \
+                    if nuova == "ATTO" else nuova
+            motivo = f"riclassificato {prima} -> {nuova}" + (f" ({a.motivo})" if a.motivo else "")
+            if conserva:
+                motivo += f"; lettura {v['lettura']} del {v.get('letto_il') or 'data ignota'} conservata"
+            v["nota"] = (v["nota"] + "; " if v["nota"] else "") + motivo
+            mossi += 1
+    print(f"Riclassificati {mossi} documenti come {nuova} in {Path(S_radice).name}.")
+    print(f"  ({S_radice})")
+    for i, stato, perc in protetti:
+        print(f"  RIFIUTATO: #{i} risulta gia' {stato} — {perc}")
+    if protetti:
+        print("  La scheda gia' scritta andrebbe perduta al primo ricensimento.")
+        print("  Ripetere con --forza per spostarlo conservando lettura e sintesi.")
+    for i in ignoti:
+        print(f"  ATTENZIONE: id #{i} inesistente")
+    return 1 if (ignoti or protetti) else 0
+
+
+_MARCHE_LIMITE = re.compile(
+    r"illeggibil|non citabil|non ricercabil|non e' stato possibile|non è stato possibile|"
+    r"non lette|non letto per intero|non estesa|non sono state lette|OCR degradato|"
+    r"OCR di scarsa qualit|quasi interamente illeggibil",
+    re.I)
+
+
+def _limite_dichiarato(v):
+    """La scheda dichiara da se' di non aver letto o capito il documento.
+
+    Nato il 05-09-2026: tre atti marcati LETTO portavano una sintesi che diceva
+    'OCR quasi interamente illeggibile' o 'non citabile', e il cancello non li
+    vedeva. Erano i tre atti che decidevano la commessa.
+    """
+    return bool(_MARCHE_LIMITE.search((v.get("sintesi") or "") + " " + (v.get("nota") or "")))
+
+
+def cmd_aperti(a):
+    """Elenca gli atti su cui la lettura e' rimasta aperta."""
+    f, S = carica(a.cartella)
+    valori = list(S["file"].values()) if isinstance(S["file"], dict) else S["file"]
+    atti = [v for v in valori if v.get("classe") == "ATTO"]
+    par = [v for v in atti if v["lettura"] == "PARZIALE"]
+    lim = [v for v in atti if v["lettura"] == "LETTO" and _limite_dichiarato(v)]
+    if not par and not lim:
+        print("Nessun atto con lettura aperta."); return
+    print(f"Atti con lettura APERTA: {len(par)+len(lim)} su {len(atti)}")
+    if par:
+        print("\n-- letti in parte, da completare --")
+        for v in par:
+            print(f"  [{v['id']}] {v['nome']}")
+            print("       " + (v.get("nota") or "")[:150])
+    if lim:
+        print("\n-- marcati letti, ma la scheda dichiara un limite: RIAPRIRE A VISTA --")
+        for v in lim:
+            print(f"  [{v['id']}] {v['nome']}")
+            print("       " + (v.get("sintesi") or "")[:150])
+    print("\nSe il testo estratto non basta, NON si chiude la scheda dichiarando il")
+    print("documento illeggibile: si richiede un OCR migliore e si rilegge.")
+
+
+def cmd_propri(a):
+    """Cerca fra gli ATTI i documenti che sembrano prodotti da noi.
+
+    Il censimento riconosce da solo i casi certi - la cartella e l'estensione -
+    ma non puo' leggere dentro un .docx o un .pdf mentre censisce. Questo comando
+    lo fa dopo, sul testo che l'indice ha gia' estratto, e NON decide da solo:
+    stampa i sospetti con l'indizio che li ha fatti sospettare, e li sposta solo
+    con `--applica`.
+
+    La ragione per cui esiste sta in una riga di un fascicolo vero: una scheda
+    criteri prodotta dal nostro ufficio gare risultava ATTO e LETTA, e sarebbe
+    stata citabile come `fonte:pagina` al pari del capitolato. Un'analisi che cita
+    se stessa e' l'unico errore che nessun cancello sulle citazioni puo' vedere,
+    perche' la citazione e' formalmente perfetta.
+    """
+    f, S = carica(a.cartella)
+    radice = Path(S["radice"])
+    testi = {}
+    db = trova_indice(radice)
+    if db:
+        try:
+            con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+            for path, testo in con.execute(
+                    "SELECT d.path, p.text FROM pages p JOIN documents d ON d.id=p.doc_id "
+                    "WHERE p.page<=1"):
+                testi[path] = (testo or "")[:900]
+            con.close()
+        except sqlite3.Error:
+            testi = {}
+    # Gli alberi di software si riconoscono guardando TUTTO il fascicolo insieme,
+    # non un file per volta: la prova che `_PLUGIN_SCHEDE_5C` e' un attrezzo sta
+    # in un `plugin.json` che e' un altro file.
+    attrezzi = cartelle_attrezzo(v["percorso"] for v in S["file"])
+    sospetti = []
+    for v in S["file"]:
+        if v.get("classe") != "ATTO":
+            continue
+        motivo = e_nostro(v["percorso"], testi.get(v["percorso"], ""), attrezzi)
+        if motivo:
+            sospetti.append((v, motivo))
+    if not sospetti:
+        print("Nessun atto sembra un nostro elaborato.")
+        if not db:
+            print("  (indice non trovato: sono state guardate solo cartella ed estensione)")
+        return 0
+    print(f"SOSPETTI ELABORATI NOSTRI — {len(sospetti)} documenti classificati ATTO\n")
+    print("Un documento prodotto da noi non prova nulla: non deve stare nel")
+    print("denominatore della copertura e non deve essere citabile come fonte.\n")
+    for v, motivo in sospetti:
+        print(f"  #{v['id']:<4} {v['percorso']}")
+        print(f"        {motivo}")
+        if v.get("lettura") in ACQUISITE:
+            print(f"        (risulta {v['lettura']}: la scheda viene conservata)")
+    if not a.applica:
+        print("\nNessuna modifica. Per spostarli:")
+        print(f'  copertura.py propri "{a.cartella}" --applica')
+        print("Per tenerne uno fra gli atti, dopo l'applicazione:")
+        print('  copertura.py classe "<cartella>" <id> --atto --motivo "..."')
+        return 1
+    with stato_esclusivo(a.cartella) as (f2, S2):
+        n = 0
+        for v, motivo in sospetti:
+            x = next((y for y in S2["file"] if y["id"] == v["id"]), None)
+            if x is None:
+                continue
+            x["classe"] = "PROPRIO"
+            x["nota"] = ((x["nota"] + "; ") if x["nota"] else "") + \
+                f"riclassificato ATTO -> PROPRIO ({motivo})"
+            n += 1
+    print(f"\nSpostati {n} documenti in PROPRIO. Restano nella tabella di copertura,")
+    print("fuori dal denominatore, e non sono piu' citabili come atti del fascicolo.")
+    return 0
+
+
+def cmd_report(a):
+    f, S = carica(a.cartella)
+    radice = Path(S["radice"])
+    indice, dove = leggi_indice(radice)
+    (da_l, letti, parz, escl, senza, non_idx, perse, mute_ocr,
+     deriv, srv, attest) = classifica(S, indice)
+    tot = len(da_l) + len(letti) + len(parz) + len(escl) + len(senza)
+    coperti = len(letti) + len(parz) + len(escl) + len(senza)
+    out = f.parent
+
+    # I duplicati vivevano dentro `deriv`, e il documento consegnato ne
+    # ereditava due errori: contava le copie identiche fra le trascrizioni - 1
+    # diventava 3 - e le descriveva come «trascrizioni», che in un fascicolo
+    # forense e' un'altra cosa. Una copia identica trasmessa a un secondo
+    # destinatario prova cosa e' stato notificato a chi; una trascrizione e'
+    # materiale di lavoro. `stato` a video li teneva gia' distinti: erano i due
+    # documenti che escono a dire il contrario.
+    dupl = [v for v in deriv if v.get("classe") == "DUPLICATO"]
+    trascriz = [v for v in deriv if v.get("classe") != "DUPLICATO"]
+    ocr_prodotti = sum(1 for v in S["file"] if v.get("versione_ocr"))
+    ignorati = len(S.get("ignorati", []))
+
+    r = ["# Tabella di copertura documentale", "",
+         f"Cartella: `{radice}`  ", f"Censimento del {S['censito_il']}", "",
+         "| Voce | Numero |", "|---|---:|",
+         # La riga diceva «file presenti nella cartella» e stampava i file
+         # CENSITI: chi li conta in Esplora risorse ne trova di piu' e nel
+         # documento non c'era una riga a spiegare la differenza.
+         f"| File censiti (atti, derivati, di servizio) | {S['totale']} |",
+         f"| — di cui trascrizioni e versioni di atti già presenti | {len(trascriz)} |"]
+    if dupl:
+        r.append(f"| — di cui copie identiche di atti già contati | {len(dupl)} |")
+    propri = [v for v in srv if v.get("classe") == "PROPRIO"]
+    r.append(f"| — di cui di servizio (script, backup, registri di lavoro) | "
+             f"{len(srv) - len(propri)} |")
+    if propri:
+        r.append(f"| — di cui **elaborati prodotti da noi**, non atti ricevuti | "
+                 f"{len(propri)} |")
+    # Le due righe che chiudono il conto con cio' che si vede sul disco. Sono
+    # esclusioni giuste - ricontare un `_OCR` gonfierebbe il denominatore - ma
+    # non dichiararle lasciava senza risposta la prima domanda che fa chi
+    # riceve il documento: perche' qui i file sono meno di quelli che conto io.
+    if ocr_prodotti:
+        r.append(f"| Versioni `_OCR` prodotte dallo strumento, non ricontate | {ocr_prodotti} |")
+    if ignorati:
+        r.append(f"| File di sistema ignorati (Thumbs.db e simili) | {ignorati} |")
+    r += [
+         f"| **Atti del fascicolo** | **{tot}** |",
+         f"| Indicizzati e quindi ricercabili | {len(indice) if indice else 'n/d'} |",
+         f"| Letti integralmente | {len(letti)} |",
+         f"| Letti parzialmente (motivati) | {len(parz)} |",
+         f"| Senza testo (grafici e CAD) | {len(senza)} |",
+         f"| Esclusi con motivazione | {len(escl)} |",
+         f"| **Copertura formale** | **{coperti}/{tot} = {100.0*coperti/tot if tot else 100:.1f}%** |",
+         f"| **Copertura citabile** (solo atti letti integralmente) | "
+         f"**{len(letti)}/{tot} = {100.0*len(letti)/tot if tot else 100:.1f}%** |"]
+    # La copertura in PAGINE. Un documento di 779 pagine e una lettera pesano
+    # uguale nel conto dei documenti, e la tabella che apre la relazione diceva
+    # 100% su un fascicolo guardato per il 15% della sua carta.
+    p_lette, p_tot, p_muti = copertura_in_pagine(S, pagine_da_indice(radice))
+    if p_tot:
+        r.append(f"| Pagine degli atti (contate dall'indice) | {p_tot} |")
+        etichetta = "**Copertura in pagine** (minimo)" if p_muti else "**Copertura in pagine**"
+        r.append(f"| {etichetta} | **{p_lette}/{p_tot} = {100.0*p_lette/p_tot:.1f}%** |")
+    r.append("")
+    if p_muti:
+        r += [f"> ⚠️ La copertura in pagine e' un **minimo**: {len(p_muti)} atti letti in "
+              f"parte non dichiarano quali pagine sono state lette, e qui contano zero.",
+              ""]
+    # Un atto letto in parte e' un lavoro APERTO, non una scheda chiusa: contarlo
+    # nella copertura ha gia' prodotto, su commessa reale, tre affermazioni false
+    # in un documento destinato alla Stazione appaltante (05-09-2026, ALATRI:
+    # 30 atti su 113 erano PARZIALE e la copertura diceva 100%).
+    aperti = list(parz) + [v for v in letti if _limite_dichiarato(v)]
+    if aperti:
+        r += ["", "> 🔴 **ATTENZIONE — {} atti su {} ({:.1f}%) hanno una lettura APERTA.**".format(
+                  len(aperti), tot, 100.0*len(aperti)/tot if tot else 0),
+              "> Su questi atti **non si afferma un'assenza**: che un dato non ci sia si dice solo",
+              "> dopo aver aperto il documento, mai dalla scheda. L'elenco e' qui sotto e si ottiene",
+              "> anche con `copertura.py aperti \"<cartella>\"`.", ""]
+    if parz:
+        r += ["## Letti parzialmente — DA COMPLETARE", ""] + [f"- `{v['percorso']}` — {v['nota']}" for v in parz] + [""]
+    illeg = [v for v in letti if _limite_dichiarato(v)]
+    if illeg:
+        r += ["## Marcati letti, ma la scheda dichiara da sé un limite", "",
+              "Una scheda che dichiara illeggibile o incompleto il proprio testo **non è una "
+              "lettura**: questi atti vanno riaperti a vista, e se il testo estratto non basta "
+              "va richiesto un OCR migliore.", ""]
+        r += [f"- `{v['percorso']}` — {(v.get('sintesi') or '')[:160]}" for v in illeg] + [""]
+    if escl:
+        r += ["## Esclusi dall'analisi", ""] + [f"- `{v['percorso']}` — {v['sintesi']}" for v in escl] + [""]
+    if perse:
+        r += ["## Indicizzati solo in parte", "",
+              "Documenti presenti nell'indice in cui alcune pagine non sono ricercabili.", ""]
+        r += [f"- `{p}` — {n-t} pagine su {n} non ricercabili" for p, n, t in perse] + [""]
+    if mute_ocr:
+        r += ["## Pagine prive di testo anche dopo il riconoscimento", "",
+              "Riconosciute con l'OCR, e risultate senza testo: di norma documentazione "
+              "fotografica. Restano fuori da ogni ricerca e vanno guardate a occhio.", ""]
+        r += [f"- `{p}` — {n-t} pagine su {n}" for p, n, t in mute_ocr] + [""]
+    if attest:
+        r += ["## Acquisiti per attestazione", "",
+              "Atti da cui non si ricava testo — ricevute PEC, allegati firmati — "
+              "aperti e attestati da chi li ha letti. Da questi non si cita "
+              "`fonte:pagina`.", ""]
+        r += [f"- `{v['percorso']}`" for v in attest] + [""]
+    if non_idx:
+        r += ["## Non ricercabili (assenti dall'indice)", ""]
+        r += [f"- `{v['percorso']}` — {st}" for v, st in non_idx] + [""]
+    if da_l:
+        r += ["## NON LETTI", ""] + [f"- `{v['percorso']}`" for v in da_l] + [""]
+    # Le collocazioni si ricostruiscono da DUE fonti, e non e' ridondanza. Le
+    # copie escono dalla sezione dei derivati, quindi questa resta l'unico posto
+    # del documento in cui sono nominate; se si costruisse sul solo campo del
+    # capofila - un registro scritto da una versione anteriore, un censimento
+    # interrotto - sparirebbero dal fascicolo consegnato senza lasciare traccia,
+    # che e' il difetto che questo plugin esiste per impedire.
+    collocazioni = {}
+    for v in S["file"]:
+        for x in v.get("altre_collocazioni") or ():
+            collocazioni.setdefault(v["percorso"], []).append(x)
+    for v in dupl:
+        capo = v.get("duplicato_di") or "(capofila non registrato)"
+        if v["percorso"] not in collocazioni.get(capo, []):
+            collocazioni.setdefault(capo, []).append(v["percorso"])
+    if collocazioni:
+        r += ["## Documenti presenti in piu' collocazioni", "",
+              "Contati e letti una volta sola. La collocazione e' pero' essa stessa "
+              "un fatto — dimostra cosa e' stato trasmesso a chi — e va conservata.", ""]
+        for capo in sorted(collocazioni):
+            r += [f"- `{capo}`"] + [f"    - anche in `{x}`" for x in sorted(set(collocazioni[capo]))]
+        r += [""]
+    if trascriz:
+        r += ["## Derivati, non ricontati", "",
+              "Trascrizioni e versioni riconosciute di atti già presenti: contarli "
+              "una seconda volta gonfierebbe il fascicolo.", ""]
+        r += [f"- `{v['percorso']}`" + (f" — da `{v['derivato_di']}`" if v.get("derivato_di") else "")
+              for v in trascriz] + [""]
+    if srv:
+        r += ["## File di servizio, fuori dall'analisi", "",
+              "Non sono atti del fascicolo: script, backup, registri di lavoro. "
+              "Sono elencati perché nulla sparisca in silenzio, ma non pretendono "
+              "una scheda di lettura.", ""]
+        r += [f"- `{v['percorso']}`" for v in srv] + [""]
+    (out / "copertura.rpt").write_text("\n".join(r), encoding="utf-8")
+
+    s = ["# Indice ragionato del fascicolo", ""]
+    corrente = None
+    for v in sorted(S["file"], key=lambda v: (v["cartella"], v["nome"])):
+        if v["cartella"] != corrente:
+            corrente = v["cartella"]; s += ["", f"## {corrente}", ""]
+        if v["lettura"] in ACQUISITE:
+            etich = {"LETTO": "", "PARZIALE": " *(lettura parziale)*",
+                     "ESCLUSO": " *(escluso)*"}[v["lettura"]]
+            desc = v["sintesi"] or "—"
+        elif v["lettura"] == "SENZA_TESTO":
+            etich, desc = "", "*(allegato grafico o binario: nessun testo)*"
+        elif v["lettura"] == "DA_APRIRE":
+            etich, desc = " *(NON APERTO)*", "*contenitore: il contenuto non e' stato estratto ne' letto*"
+        elif v.get("classe") == "DERIVATO":
+            rif = v.get("derivato_di") or "un atto già presente"
+            etich, desc = " *(derivato)*", f"*trascrizione di* `{rif}`"
+        elif v.get("classe") == "DUPLICATO":
+            # Nessuna classe cadeva qui, e le copie identiche finivano
+            # nell'ultimo ramo: «*(NON LETTO)* — —» nello stesso indice che si
+            # consegna insieme a una tabella che dichiara copertura 100%. I due
+            # documenti si smentivano a vicenda, e chi li riceve non aveva modo
+            # di capire che sono copie. Il contenuto e' quello del capofila, e
+            # si riporta: e' la stessa pagina, letta una volta sola.
+            rif = v.get("duplicato_di") or "un atto già presente"
+            capo = next((x for x in S["file"] if x["percorso"] == rif), None)
+            etich, desc = " *(copia identica)*", f"*copia di* `{rif}`"
+            if capo and capo.get("sintesi"):
+                qualifica = {"PARZIALE": " (letto in parte)", "ESCLUSO": " (escluso)"}.get(
+                    capo.get("lettura"), "")
+                desc = f"*copia di* `{rif}`{qualifica} — {capo['sintesi']}"
+        elif v.get("classe") == "SERVIZIO":
+            # Se qualcuno aveva gia' descritto il contenuto - accade quando un
+            # atto viene riclassificato dopo la lettura - la sintesi resta, e
+            # non si sostituisce con una formula che dice meno.
+            etich = " *(file di servizio)*"
+            desc = v.get("sintesi") or "*non è un atto del fascicolo*"
+        else:
+            etich, desc = " *(NON LETTO)*", "—"
+        s.append(f"- **#{v['id']} {v['nome']}**{etich} — {desc}")
+    (out / "schede.rpt").write_text("\n".join(s), encoding="utf-8")
+    print(f"Scritti:\n  {out/'copertura.rpt'}\n  {out/'schede.rpt'}")
+    return 0
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("censisci"); p.add_argument("cartella")
+    p.add_argument("--suffisso", default="_OCR"); p.set_defaults(f=cmd_censisci)
+    p = sub.add_parser("stato"); p.add_argument("cartella"); p.set_defaults(f=cmd_stato)
+    p = sub.add_parser("classe", help="sposta un documento fra atto, derivato e servizio")
+    p.add_argument("cartella"); p.add_argument("id", type=int, nargs="+")
+    g = p.add_mutually_exclusive_group(required=True)
+    g.add_argument("--atto", action="store_true")
+    g.add_argument("--servizio", action="store_true")
+    g.add_argument("--derivato", action="store_true")
+    g.add_argument("--proprio", action="store_true",
+                   help="e' un elaborato prodotto da noi, non un atto ricevuto")
+    p.add_argument("--di", default="", help="con --derivato: percorso dell'atto di provenienza")
+    p.add_argument("--motivo", default="")
+    p.add_argument("--forza", action="store_true",
+                   help="sposta anche un documento gia' letto, conservandone lettura e sintesi")
+    p.set_defaults(f=cmd_classe)
+    p = sub.add_parser("da-leggere"); p.add_argument("cartella")
+    p.add_argument("--limite", type=int, default=15)
+    p.add_argument("--cartella-filtro", default=""); p.set_defaults(f=cmd_da_leggere)
+    p = sub.add_parser("letto"); p.add_argument("cartella"); p.add_argument("id", type=int, nargs="*")
+    p.add_argument("--sintesi"); p.add_argument("--da-stdin", action="store_true")
+    p.add_argument("--completata", action="store_true",
+                   help="l'atto era una lettura PARZIALE e ora e' stato letto per intero: "
+                        "le pagine dichiarate si cancellano e conta l'atto intero. Senza "
+                        "questo, registrare come LETTO un atto parziale viene rifiutato")
+    p.set_defaults(f=cmd_letto)
+    p = sub.add_parser("parziale"); p.add_argument("cartella"); p.add_argument("id", type=int)
+    p.add_argument("--sintesi", required=True); p.add_argument("--motivo", required=True)
+    p.add_argument("--pagine", required=True,
+                   help="quali pagine sono state lette: \"1-5,32,40\", oppure "
+                        "\"non-paginato\" per fogli di calcolo ed e-mail")
+    p.add_argument("--causa", choices=["MIRATA", "RIPRODUCE", "ILLEGGIBILE"],
+                   help="perche' il resto non e' stato letto. MIRATA non afferma nulla "
+                        "sul resto; RIPRODUCE afferma che sta in un altro atto ed esige "
+                        "--riproduce, con confronto automatico delle pagine saltate; "
+                        "ILLEGGIBILE rimanda al cancello di integrita'. Se omessa vale "
+                        "MIRATA, ma un motivo che afferma una riproduzione viene "
+                        "rifiutato finche' non la si dichiara.")
+    p.add_argument("--riproduce", action="append", metavar="PERCORSO",
+                   help="l'atto gia' letto di cui questo sarebbe copia (ripetibile)")
+    p.set_defaults(f=cmd_parziale)
+    p = sub.add_parser("pagine",
+                       help="dichiara quali pagine ha letto una lettura parziale gia' registrata")
+    p.add_argument("cartella"); p.add_argument("id", type=int)
+    p.add_argument("--pagine", required=True); p.set_defaults(f=cmd_pagine)
+    p = sub.add_parser("aperti"); p.add_argument("cartella"); p.set_defaults(f=cmd_aperti)
+    p = sub.add_parser("escludi"); p.add_argument("cartella"); p.add_argument("id", type=int, nargs="+")
+    p.add_argument("--motivo", required=True); p.set_defaults(f=cmd_escludi)
+    p = sub.add_parser("propri",
+                       help="cerca fra gli atti i documenti prodotti da noi")
+    p.add_argument("cartella")
+    p.add_argument("--applica", action="store_true",
+                   help="sposta i sospetti nella classe PROPRIO")
+    p.set_defaults(f=cmd_propri)
+    p = sub.add_parser("report"); p.add_argument("cartella"); p.set_defaults(f=cmd_report)
+    a = ap.parse_args()
+    sys.exit(a.f(a))
+
+
+if __name__ == "__main__":
+    main()
