@@ -209,7 +209,7 @@ Ordinato per rapporto fra beneficio e sforzo. Nessuno di questi e' un plugin nuo
 | **6** | **Regola D alla fonte**: una scheda che non riferisce nulla di usabile non incrementa la copertura | audit §4 | basso |
 | **7** | **Apertura degli allegati `.msg`** in fase di acquisizione | §3.5 | medio |
 | **8** | **Escludere `_inventario` dall'indicizzazione** e vietarne lettura e citazione nei prompt dei lettori | §3.5 | minimo |
-| **9** | **Mettere il plugin nei depositi giusti**, sorgente compreso, e gli script fuori dallo scratchpad | §5 | basso |
+| **9** | ⬆️ **SALITO IN CIMA** — **`commessa-forense` nel repository `giampi`**, versionato, con caricamento del plugin solo da li'. Piu' gli script fuori dallo scratchpad. Motivo al §6-ter.1-2 | §5, §6-ter | basso |
 
 **Gli interventi 2, 3, 4 e 9 sono quasi gratuiti** e chiudono due dei quattro errori di
 Caltagirone piu' la dispersione degli strumenti. Da li' conviene partire.
@@ -310,6 +310,57 @@ si rischia di ripartire da li'"*), qui a parti invertite.
 ramo sbagliato e si perde il lavoro dell'altro. E' anche la ragione per cui il punto 9 del piano
 (rimettere il plugin in un deposito unico e versionato) non e' burocrazia: e' cio' che impedisce
 che questo succeda di nuovo.
+
+### 6-ter.1 — La copia che gira e' un caricamento manuale (rilevato l'11/09)
+
+Il plugin installato risulta:
+
+```
+Commessa forense — di local-desktop-app-uploads · 0.10.0 · 1 competenza · aggiornato 6 giorni fa
+```
+
+`local-desktop-app-uploads` significa **caricato a mano dall'app desktop**: la sorgente vive sul
+PC, e la copia installata e' una **fotografia congelata al momento del caricamento**.
+«6 giorni fa» rispetto all'11/09 = **5 settembre**.
+
+Incrociando con Drive:
+
+| Copia | Ultima modifica | `copertura.py` |
+|---|---|---|
+| **installata (in esercizio)** | **5 settembre** | ? |
+| `plugins/commessa-forense/` | **7 settembre** | 105.602 byte |
+| `commessa-forense_marketplace/` | 6 settembre (copia in blocco) | 73.295 byte |
+
+Le date di `plugins/` sono sfalsate (`copertura.py` 16:22, `qualita.py` 17:08): sembrano
+lavorazioni reali, non una copia in blocco.
+
+**Ipotesi da verificare, non ancora confermata:** su Caltagirone (9-10 settembre) potrebbe essere
+girata la versione del **5 settembre**, priva delle modifiche del 7. Se cosi' fosse, parte dei
+difetti rilevati potrebbe essere **gia' corretta in sorgente e mai entrata in esercizio**.
+
+**Controllo che chiude la questione**, sulla cartella sorgente del plugin al PC:
+
+```powershell
+Get-Item .\scripts\copertura.py, .\scripts\qualita.py | Select-Object Name, Length, LastWriteTime
+```
+
+Confronto: **105.602 / 120.324** (ramo `plugins/`) contro **73.295 / 87.667** (ramo marketplace).
+
+### 6-ter.2 — Il problema e' il meccanismo, non la singola versione
+
+Con il caricamento manuale, **ogni modifica fatta sul PC non ha effetto finche' non si ricarica il
+plugin**. Il codice che si modifica e il codice che gira sono due cose distinte, e nulla lo
+ricorda all'operatore.
+
+E' questo che genera i disallineamenti che l'audit del 05-09 rincorreva a mano. Non e' disordine:
+**e' l'assenza di una fonte unica.**
+
+**Conseguenza sul piano: il punto 9 sale in cima.** Mettere `commessa-forense` nel repository
+`giampi`, versionarlo, e caricare il plugin sempre e solo da li'. Una fonte, una storia, e
+`git log` al posto del confronto fra le dimensioni dei file.
+
+Ogni modifica al codice — a partire dall'intervento 1 — va seguita da un **ricaricamento
+esplicito**, altrimenti non entra in esercizio.
 
 ---
 
