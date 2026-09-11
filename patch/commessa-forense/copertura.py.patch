@@ -1,0 +1,151 @@
+--- copertura.orig.py	2026-09-11 16:29:11.544039759 +0000
++++ copertura.py	2026-09-11 16:30:41.103464010 +0000
+@@ -15,6 +15,7 @@
+ file che il motore ha saltato in silenzio.
+ """
+ import argparse, hashlib, json, os, re, sqlite3, struct, subprocess, sys, time
++import unicodedata
+ from contextlib import contextmanager
+ from datetime import datetime
+ from pathlib import Path
+@@ -1532,23 +1533,116 @@
+     return 1 if errori else 0
+ 
+ 
++RIPRODUZIONE_AFFERMATA = (
++    "riproduc", "gia letto", "gia letta", "gia lette", "gia letti",
++    "copia di", "copia del", "copia della", "e copia", "identic",
++    "duplicat", "stesso testo", "medesimo testo", "stesso contenuto",
++    "medesimo contenuto", "gia presente", "gia acquisit", "gia visto",
++    "riportato in", "riportata in", "si ritrova in", "coincide con",
++)
++
++
++def _motivo_afferma_riproduzione(motivo: str) -> bool:
++    """Il motivo sostiene che il contenuto sta gia' altrove?
++
++    Non e' un giudizio sulla qualita' del motivo: e' il riconoscimento di
++    un'AFFERMAZIONE, che in quanto tale va provata. «Ho letto solo le tabelle di
++    bilancio» non dice nulla del resto ed e' una scelta; «riproduce il parere
++    627» dice che il resto e' gia' noto, ed e' una tesi.
++    """
++    if not motivo:
++        return False
++    t = unicodedata.normalize("NFKD", motivo)
++    t = "".join(c for c in t if not unicodedata.combining(c)).casefold()
++    # Gli apostrofi vanno tolti prima del confronto: senza, «gia' letto» non
++    # combaciava con la spia «gia letto» e passava liscio. E' la forma che i
++    # lettori usano piu' spesso, perche' il plugin vieta le lettere accentate.
++    t = re.sub(r"[\u0027\u2019\u02bc`]+", "", t)
++    t = re.sub(r"\s+", " ", t)
++    return any(spia in t for spia in RIPRODUZIONE_AFFERMATA)
++
++
+ def cmd_parziale(a):
+     quante = conta_pagine(a.pagine)
+     if quante < 0:
+         sys.exit(f"ERRORE: --pagine \"{a.pagine}\" non si legge. Attese pagine e "
+                  f"intervalli separati da virgola: \"1-5,32,40\". Per un documento "
+                  f"senza pagine (foglio di calcolo, e-mail): \"non-paginato\".")
++
++    # Una lettura parziale salta delle pagine per due ragioni diverse, e una
++    # sola delle due e' un'affermazione sul loro contenuto. Misurato su
++    # Caltagirone il 10 settembre 2026: il D.D.G. 3/2024 fu registrato con
++    # motivo «riproduce il parere 627, gia' letto» e ventuno pagine restarono
++    # fuori. Contenevano i pareri CTS 350/2023 e 526/2023, che non esistono in
++    # nessun altro punto del fascicolo, e da li' e' uscito il riscontro sulla
++    # CA 4 lett. i). La motivazione era prosa, e la prosa non si controlla.
++    causa = (getattr(a, "causa", None) or "").strip().upper()
++    if not causa and _motivo_afferma_riproduzione(a.motivo):
++        sys.exit(
++            "ERRORE: il motivo afferma che il contenuto sta gia' in un altro atto,\n"
++            "ma non lo dichiara in forma verificabile, e cosi' nessuno puo' controllarlo.\n"
++            f"  motivo: «{a.motivo}»\n"
++            "  Se e' davvero una riproduzione, dichiararla e farla verificare:\n"
++            "    --causa RIPRODUCE --riproduce \"<percorso dell'atto gia' letto>\"\n"
++            "  Se invece la lettura e' stata mirata e sul resto non si afferma nulla:\n"
++            "    --causa MIRATA\n"
++            "  (Caltagirone, D.D.G. 3/2024: ventuno pagine date per copia del parere\n"
++            "  627 contenevano i pareri 350/2023 e 526/2023, unici nel fascicolo.)")
++    if not causa:
++        causa = "MIRATA"
++    if causa not in ("MIRATA", "RIPRODUCE", "ILLEGGIBILE"):
++        sys.exit(f"ERRORE: --causa \"{a.causa}\" non ammessa. "
++                 f"Ammesse: MIRATA, RIPRODUCE, ILLEGGIBILE.")
++    riferimenti = list(getattr(a, "riproduce", None) or [])
++    if causa == "RIPRODUCE" and not riferimenti:
++        sys.exit("ERRORE: --causa RIPRODUCE richiede --riproduce \"<percorso dell'atto "
++                 "gia' letto>\": senza, non c'e' nulla con cui confrontare.")
++
++    # Il rifiuto non si solleva dentro il lock: si annota e si esce dopo, cosi'
++    # il registro non viene toccato da una registrazione che non si fara'.
++    rifiuto = None
++    radice = ""
+     with stato_esclusivo(a.cartella) as (f, S):
+-        e = _registra(S, a.id, "PARZIALE", a.sintesi, f"lettura parziale: {a.motivo}")
+-        if e:
+-            sys.exit(e)
+-        for v in S["file"]:
+-            if v["id"] == a.id:
+-                v["pagine_lette"] = a.pagine
+-                break
+         radice = S["radice"]
++        if causa == "RIPRODUCE":
++            try:
++                import parziali_confronto
++            except ImportError:
++                rifiuto = ("ERRORE: parziali_confronto.py non e' accanto a copertura.py.\n"
++                           "  Senza il confronto, «riproduce un atto gia' letto» resterebbe\n"
++                           "  un'affermazione non verificata: la registrazione non si fa.\n"
++                           "  Un verificatore mancante non e' un lasciapassare.")
++            else:
++                percorso = next((v["percorso"] for v in S["file"] if v["id"] == a.id), None)
++                if percorso is None:
++                    rifiuto = f"id #{a.id} inesistente"
++                else:
++                    esito = parziali_confronto.confronta(
++                        Path(radice), percorso, a.pagine, riferimenti)
++                    if not esito["regge"]:
++                        rifiuto = parziali_confronto.spiega(
++                            esito, percorso, ", ".join(riferimenti))
++        if rifiuto is None:
++            e = _registra(S, a.id, "PARZIALE", a.sintesi, f"lettura parziale: {a.motivo}")
++            if e:
++                rifiuto = e
++            else:
++                for v in S["file"]:
++                    if v["id"] == a.id:
++                        v["pagine_lette"] = a.pagine
++                        v["causa_parziale"] = causa
++                        if causa == "RIPRODUCE":
++                            v["riproduce"] = riferimenti
++                        else:
++                            v.pop("riproduce", None)
++                        break
++    if rifiuto:
++        sys.exit(rifiuto)
+     print(f"#{a.id} registrato come letto parzialmente in {Path(radice).name}"
+-          f" ({quante} pagine dichiarate).")
++          f" ({quante} pagine dichiarate, causa {causa}).")
++    if causa == "RIPRODUCE":
++        print(f"  confronto superato: le pagine non lette si ritrovano in "
++              f"{', '.join(riferimenti)}")
+     print(f"  ({radice})")
+     return 0
+ 
+@@ -1988,6 +2082,15 @@
+     p.add_argument("--pagine", required=True,
+                    help="quali pagine sono state lette: \"1-5,32,40\", oppure "
+                         "\"non-paginato\" per fogli di calcolo ed e-mail")
++    p.add_argument("--causa", choices=["MIRATA", "RIPRODUCE", "ILLEGGIBILE"],
++                   help="perche' il resto non e' stato letto. MIRATA non afferma nulla "
++                        "sul resto; RIPRODUCE afferma che sta in un altro atto ed esige "
++                        "--riproduce, con confronto automatico delle pagine saltate; "
++                        "ILLEGGIBILE rimanda al cancello di integrita'. Se omessa vale "
++                        "MIRATA, ma un motivo che afferma una riproduzione viene "
++                        "rifiutato finche' non la si dichiara.")
++    p.add_argument("--riproduce", action="append", metavar="PERCORSO",
++                   help="l'atto gia' letto di cui questo sarebbe copia (ripetibile)")
+     p.set_defaults(f=cmd_parziale)
+     p = sub.add_parser("pagine",
+                        help="dichiara quali pagine ha letto una lettura parziale gia' registrata")
