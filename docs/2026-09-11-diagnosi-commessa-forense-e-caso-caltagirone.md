@@ -201,7 +201,7 @@ Ordinato per rapporto fra beneficio e sforzo. Nessuno di questi e' un plugin nuo
 
 | # | Intervento | Chiude | Sforzo |
 |---|---|---|---|
-| **1** | **Copertura in pagine oltre che in atti.** `781/781` diventa anche `3.155/16.402`, con l'elenco delle pagine saltate e la motivazione dichiarata | §3.1 | medio |
+| **1** | ✅ **DECISO** — **Copertura in pagine oltre che in atti.** `781/781` diventa anche `3.155/16.402`, con l'elenco delle pagine saltate e la motivazione dichiarata. **Specifica al §6-bis** | §3.1 | medio |
 | **2** | **`parziali_confronto.py` dentro il cancello di copertura.** Ogni «gia' letto» verificato dalla macchina, subito, non a mano a fine lavoro | §3.2 | basso — lo script esiste |
 | **3** | **`indicizza2.py` come criterio di fine indicizzazione**, per cartella di primo livello. Mai «nessun documento nuovo» | §3.3 | basso — lo script esiste |
 | **4** | **Divieto di `--max-seconds`** scritto nel `SKILL.md`, con la ragione | §3.3 | minimo |
@@ -218,7 +218,98 @@ Caltagirone piu' la dispersione degli strumenti. Da li' conviene partire.
 
 L'intervento **1** e' quello che cambia di piu' la percezione: **il giorno che la copertura si
 misura in pagine, il 100% di oggi diventa onestamente un 19%**. Non e' un peggioramento del
-lavoro — e' la fine di un dato che rassicurava senza fondamento. Va deciso consapevolmente.
+lavoro — e' la fine di un dato che rassicurava senza fondamento.
+
+**Deciso l'11/09/2026: si procede.** Specifica al §6-bis.
+
+---
+
+## 6-bis. DECISO — l'intervento 1: copertura in pagine
+
+Decisione dell'utente dell'11/09/2026: **la copertura si misura in pagine.**
+
+### Il dato esiste gia'
+
+L'HANDOFF riporta `3.155/16.402 pagine (19,2%)` e distingue `570 integrali, 175 parziali con
+pagine`. Il conteggio per pagina e' quindi **gia' calcolato**: la scheda di una lettura parziale
+registra quali pagine sono state aperte.
+
+**Non e' un dato da aggiungere: e' un dato da portare dentro il cancello.** Oggi esiste nel report
+e non incide su nulla.
+
+### I tre cambiamenti
+
+**1 — `copertura.py report`: entrambi i numeri affiancati, mai uno solo.**
+
+```
+Atti letti:     781/781        (100%)
+Pagine lette:   3.155/16.402   (19,2%)
+```
+
+Sotto, l'elenco degli atti con pagine scoperte e la motivazione dichiarata. E' la tabella che va
+in testa alla relazione: chi legge deve vedere **su quanta carta** si fonda l'analisi, non solo su
+quanti atti.
+
+**2 — `copertura.py stato`: un atto parziale non si chiude.**
+
+Oggi il cancello esce 1 finche' restano documenti non letti, assenti dall'indice o indicizzati
+solo in parte. Deve esporre anche il conteggio delle pagine e **tenere esplicite le pagine
+scoperte** di ogni atto letto in parte, invece di considerarlo concluso.
+
+**3 — La motivazione della lettura parziale diventa un campo tipizzato.**
+
+Oggi il lettore scrive prosa libera (*"riproduce il 627, gia' letto"*), che nessuno puo'
+controllare. Deve invece dichiarare una causa presa da un elenco chiuso:
+
+| Causa | Significato | Controllo |
+|---|---|---|
+| `MIRATA` | lettura mirata deliberata (calcoli, datasheet, schemi, certificati) | nessuno — e' una scelta legittima, ma resta visibile nell'elenco |
+| `RIPRODUCE` | il contenuto e' gia' stato letto in un altro atto | **verificata da `parziali_confronto.py`**; se il confronto fallisce, l'atto torna da leggere |
+| `ILLEGGIBILE` | pagine non estraibili | rimanda al cancello di integrita' |
+
+### Il criterio di blocco — proporzionato
+
+**Il cancello NON deve bloccare sulla percentuale di pagine.** Pretendere il 100% delle pagine
+sarebbe assurdo: nessuno legge 123 pagine di studio idraulico per ricavarne una portata, e la
+lettura mirata e' tecnica corretta.
+
+Sulle pagine il cancello **informa**: mostra il numero, elenca gli atti scoperti, lascia la
+decisione all'operatore.
+
+**Blocca invece sulle `RIPRODUCE` non verificate**, perche' quelle non sono scelte: sono
+affermazioni, e finche' non sono provate sono affermazioni non verificate. E' esattamente il caso
+del D.D.G. 3 (§3.2).
+
+### Effetto atteso, da mettere in conto
+
+Il giorno in cui la modifica entra in servizio, **la copertura di Caltagirone passa da `100%` a
+`19,2%`**. Il lavoro non peggiora di un millimetro: finisce soltanto un numero che rassicurava
+senza averne titolo.
+
+---
+
+## 6-ter. ATTENZIONE — due copie divergenti di `commessa-forense`
+
+Rilevato su Drive l'11/09, **prima di toccare il codice**:
+
+| | `plugins/commessa-forense/` | `commessa-forense_marketplace/` |
+|---|---|---|
+| `scripts/copertura.py` | **105.602 byte** | 73.295 byte |
+| `scripts/qualita.py` | **120.324 byte** | 87.667 byte |
+| ultima modifica | **7 settembre** | 6 settembre |
+| cartella `prove/` | **presente** | assente |
+| `plugin.json` | da verificare | v0.10.0 |
+
+**Il deposito marketplace e' indietro di oltre 30 KB su entrambi gli script**, piu' la cartella
+dei test: circa il 30% del codice.
+
+E' la stessa classe di problema segnalata al §6 dell'audit del 05-09 (*"la sorgente e' indietro:
+si rischia di ripartire da li'"*), qui a parti invertite.
+
+**Prima di qualsiasi modifica va stabilito quale copia e' quella viva**, altrimenti si patcha il
+ramo sbagliato e si perde il lavoro dell'altro. E' anche la ragione per cui il punto 9 del piano
+(rimettere il plugin in un deposito unico e versionato) non e' burocrazia: e' cio' che impedisce
+che questo succeda di nuovo.
 
 ---
 
@@ -238,6 +329,7 @@ lavoro — e' la fine di un dato che rassicurava senza fondamento. Va deciso con
    altrove? Determina se l'intervento 1 e' una modifica o un'aggiunta.
 2. `parziali_confronto.py` e `indicizza2.py` sono ancora recuperabili, o lo scratchpad che li
    conteneva e' gia' stato ripulito?
-3. La copia viva del plugin: marketplace, PC, o zip `commessa-forense-v0.10.0.zip` su Drive?
+3. **Quale copia del plugin e' quella viva** — v. §6-ter: le due su Drive divergono di oltre
+   30 KB per script. **Da chiarire prima di scrivere una riga di codice.**
 4. Le **tre regole d'uso per fascicoli voluminosi** in corso di stesura: quali sono, per non
    duplicare il lavoro.
