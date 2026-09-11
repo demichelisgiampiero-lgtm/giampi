@@ -17,6 +17,13 @@ esaminata**: non è sincronizzata e non era accessibile dalla sessione remota.
 Alcune delle debolezze elencate potrebbero quindi essere **già state risolte** in
 `commessa-forense`. La prima cosa da fare al PC è confrontare i due motori, prima di intervenire.
 
+> **AGGIORNAMENTO dell'11/09, stessa giornata.** `commessa-forense` è stato poi reperito su
+> Google Drive ed esaminato. È un plugin maturo che fa già il lavoro di schedatura, e la
+> diagnosi è proseguita sul caso reale Caltagirone. **Leggere
+> `2026-09-11-diagnosi-commessa-forense-e-caso-caltagirone.md`, che aggiorna questo documento
+> e ne ritira una proposta.** Restano validi: la valutazione di Recall e dtSearch, e la
+> diagnosi su OCR e parsing.
+
 ---
 
 ## 0. In sintesi
