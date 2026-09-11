@@ -29,6 +29,8 @@ Alcune delle debolezze elencate potrebbero quindi essere **già state risolte** 
    invisibili al motore. Nessun reranker, nessun embedding, nessun thesaurus li recupera.
 4. **Quattro debolezze verificate nel codice** di `commessa-rag` (sezione 2).
 5. **Piano in quattro mosse**, ordinate per impatto (sezione 6).
+6. **dtSearch valutato** (sezione 4-bis): ottimo strumento, ma **non fa OCR** — non risolve
+   la causa principale. ~249 USD perpetui per il Desktop.
 
 ---
 
@@ -173,6 +175,67 @@ anche a fronte di disponibilità dichiarata all'uso del cloud.
 
 ---
 
+## 4-bis. dtSearch — valutazione
+
+**Cos'è:** motore di full-text retrieval commerciale, standard de facto in eDiscovery e computer
+forensics. Indicizza terabyte, oltre 25 modalità di ricerca (booleana, di prossimità, fuzzy,
+fonetica, regex, sinonimi, intervalli numerici), parser propri per centinaia di formati.
+Gira **in locale** su Windows.
+
+**Punto di forza reale per il contenzioso:** evidenzia gli hit **dentro il documento originale**
+con il riferimento di pagina. Per il riscontro manuale di un virgolettato è ottimo.
+
+### LIMITE DECISIVO: dtSearch non fa OCR
+
+Verificato sulla documentazione di supporto dtSearch: raccomanda di passare le scansioni a un OCR
+esterno (citano Acrobat) e si limita a **identificare i PDF immagine come "da OCR-izzare"**.
+
+È **lo stesso identico comportamento** dello stato `needs_ocr` di `commessa-rag`. Su un corpus con
+scansioni non trattate, dtSearch trova esattamente quanto si trova oggi: **la causa principale dei
+documenti persi resta intatta**.
+
+### Corrispondenza con i sintomi rilevati
+
+| Sintomo | Risolto da dtSearch? |
+|---|---|
+| Atti non trovati — scansioni senza OCR | **No.** Stesso limite |
+| Atti non trovati — sinonimi e formulazioni diverse | **In parte.** Fuzzy, fonetica e anelli di sinonimi: stessa famiglia di soluzione del thesaurus già presente. Nessun embedding, nessuna ricerca semantica |
+| Errori su numeri e tabelle (CME) | **No.** Indicizza testo: la struttura voce/quantità/prezzo/importo si perde ugualmente |
+| Troppi risultati irrilevanti | **In parte.** La ricerca di prossimità aiuta; manca il reranking semantico |
+| Citazione verificata | **Diversamente.** Nessun cancello `verify` sui virgolettati, ma l'evidenziazione nell'originale è ottima per il controllo manuale |
+
+**Non è un RAG.** Non sintetizza, non redige, non si integra con Claude (l'unica via sarebbe
+l'SDK Engine, a partire da 12.500 USD). È uno strumento di **istruttoria manuale**, complementare
+al motore esistente, non sostitutivo.
+
+### Prezzi
+
+> Rilevati da rivenditori e listini indicizzati: `dtsearch.com` era bloccato dal proxy di rete.
+> **Da riverificare sul sito prima dell'acquisto.**
+
+| Prodotto | Prezzo | Note |
+|---|---|---|
+| **Desktop, utente singolo** | **~249 USD** | Licenza **perpetua**; una persona, fino a 2 computer |
+| Licenza annuale "investigative" | non verificato | Dedicata a forensics ed eDiscovery |
+| Network | da ~200 USD/postazione (5-24) a 55 USD/postazione (20.000+) | |
+| Engine (SDK) | minimo **12.500 USD** per 25 server | Unica via per l'integrazione in un programma |
+
+### Conclusione
+
+A **249 USD perpetui** è un acquisto difendibile come strumento di istruttoria manuale su corpus
+grandi: software serio, con trent'anni di storia, e la cifra è modesta.
+
+**Ma non risolve il problema di precisione diagnosticato.** L'ordine corretto resta:
+
+> **L'OCR viene prima di qualunque motore di ricerca.** Che sia `commessa-rag`,
+> `commessa-forense` o dtSearch, un PDF immagine senza OCR è testo zero per tutti e tre.
+
+Quindi: **prima l'OCR** (OCRmyPDF, gratuito), **poi** misurare quanto problema residuo resta.
+Se dopo l'OCR la ricerca funziona, l'acquisto è evitato. Se non funziona, dtSearch si valuta
+sapendo esattamente cosa si sta comprando.
+
+---
+
 ## 5. Il reranker
 
 Per il sintomo "troppi risultati irrilevanti" serve un **cross-encoder** in coda al recupero:
@@ -251,6 +314,10 @@ Il golden set va costruito sui casi reali: query effettivamente usate in commess
 - [Benchmark accuratezza parsing: Docling vs Unstructured](https://www.ertas.ai/blog/pdf-parsing-accuracy-benchmark-docling-unstructured)
 - [Marker su GitHub](https://github.com/datalab-to/marker)
 - [Migliori strumenti OCR open source 2026](https://unstract.com/blog/best-opensource-ocr-tools/)
+- [dtSearch — come usare l'output OCR con i prodotti dtSearch](https://support.dtsearch.com/faq/dts0167.htm)
+- [dtSearch — funzionalità per la forensics](https://www.dtsearch.com/PLF_forensics_2.html)
+- [dtSearch — store e listino](https://www.dtsearch.com/dtStore.html)
+- [dtSearch Desktop, licenza singolo utente (rivenditore)](https://www.provantage.com/dtsearch-desktop~7DTSO177.htm)
 - [Recall — prezzi](https://www.recall.it/pricing)
 - [Recall — documentazione MCP](https://docs.recall.it/developer/mcp)
 - [Recall su Google Play](https://play.google.com/store/apps/details?id=com.recall.wiki)
