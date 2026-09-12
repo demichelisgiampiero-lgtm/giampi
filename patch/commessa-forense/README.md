@@ -303,3 +303,69 @@ Laboratorio con indice SQLite e registro reali, tre atti:
 ### Dimensione del file dopo la patch
 
 `copertura.py` patchato: **116.426 byte** (era 105.602).
+
+---
+
+## Esito finale su Caltagirone (12 settembre 2026)
+
+### Le cinque relazioni POD: l'affermazione non reggeva
+
+Con il plugin in servizio come **v0.10.1**, il confronto è stato eseguito sulle cinque relazioni
+`IT-CAL-00-EL-02` (POD2…POD6) contro POD1 (**#687**, non l'id 678 citato nelle note).
+
+**Tutte e cinque rifiutate.** Lo schema è identico e istruttivo:
+
+| | pagine sparse in testa | blocco compatto in coda | riscontro minimo |
+|---|---|---|---|
+| #688 POD2 | 5, 7, 9, 30, 35… | **198-239** | 2% |
+| #689 POD3 | 5, 7-10, 31… | **265-554** | 4% |
+| #690 POD4 | 5, 7, 30, 35… | **187-228** | 10% |
+| #691 POD5 | 5, 7, 30, 35… | **181-222** | 24% |
+| #692 POD6 | 5, 7-10, 31… | **375-575** | 4% |
+
+**La testa è condivisa, la coda no.** Le prime pagine sono davvero l'impostazione standard —
+premesse, normativa, criteri. Poi comincia il calcolo, e quello è specifico di ogni POD.
+
+*«Struttura standard già riscontrata»* era quindi **vero a metà, ed è la metà pericolosa**: la
+struttura è la stessa, il contenuto no. E il contenuto sono i calcoli.
+
+### Conferma indipendente
+
+Le pagine segnalate «senza testo bastante» dal confronto — **POD2: 158-159**, **POD6: 250-251** —
+coincidono con quelle che l'HANDOFF del 10/09 annotava come *«a resa OCR insufficiente»*. Due
+strade indipendenti, stesso risultato: lo strumento misura qualcosa di reale.
+
+### Cosa è stato registrato
+
+Le cinque sono state dichiarate **`MIRATA`** — che non afferma nulla sul resto — e le loro
+motivazioni riscritte con l'esito del confronto, la data e gli intervalli di pagine non coperte.
+Le sintesi originali sono state conservate integralmente (contenevano codici POD, kWp e cabine) e
+solo integrate.
+
+La rassegna passa così da **40 a 35**, e le cinque escono da entrambi gli elenchi: non affermano
+più nulla che non sia provato.
+
+### Discrepanza non spiegata
+
+L'11/09 un confronto su POD6 aveva dato esito **positivo** (583/583 pagine). Il 12/09, stesso
+documento e stesso riferimento, l'esito è negativo su centinaia di pagine. **I due risultati non
+sono stati riconciliati.** Si è dato credito al secondo, prodotto dalla catena verificata: impronta
+di `copertura.py` controllata, plugin in servizio come 0.10.1, percorso dell'atto preso dal
+registro anziché digitato.
+
+---
+
+## Cosa resta aperto
+
+**Otto fascicoli di calcolo** della stessa famiglia delle cinque smentite: #445, #452, #453, #454,
+#456, #458, #459 e **#687** (POD1, 231 pagine, 10 lette). Da verificare per primi **#456** — la cui
+nota dichiara essa stessa *«il capitolo conclusioni non risulta ancora letto»* — e **#687**.
+
+**Venticinque schemi elettrici** (#13-#36, #82, #194) che affermano una **ripetizione interna**
+(*«foglio per foglio del medesimo quadro»*), non una riproduzione di un altro atto.
+**`parziali_confronto.py` non sa verificarli:** `--riproduce` confronta un atto con un altro, non
+le pagine di un atto con le proprie. Servirebbe un confronto delle pagine non lette contro le sole
+pagine lette dello stesso documento. **Limite noto, non ancora colmato.**
+
+**Un falso positivo:** #590, *«simboli ripetuti senza struttura prosastica»* — la spia `ripetut`
+scatta su una descrizione di illeggibilità, non su un'affermazione di riproduzione. Uno su 35.
