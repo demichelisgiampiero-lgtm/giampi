@@ -370,7 +370,7 @@ def rassegna(cartella):
     except (OSError, ValueError) as err:
         return None, f"registro non leggibile: {err}"
     byid = {v.get("id"): v for v in S.get("file", [])}
-    fuori = []
+    fuori, disallineate = [], []
     for v in S.get("file", []):
         if v.get("lettura") != "PARZIALE":
             continue
@@ -379,10 +379,23 @@ def rassegna(cartella):
             continue
         if v.get("riproduce"):
             continue          # dichiarata e verificata al momento della registrazione
+        causa = (v.get("causa_parziale") or "").upper()
+        if causa:
+            # Qualcuno ha guardato questa lettura e ne ha dichiarato la causa: non e'
+            # piu' un'affermazione lasciata li'. Resta pero' una contraddizione da
+            # sanare - la causa dice MIRATA, la motivazione scritta dice ancora che il
+            # contenuto sta altrove - e chi legge la scheda vede solo la seconda.
+            # Misurato il 12 settembre 2026 su Caltagirone, sulle cinque relazioni POD:
+            # il confronto le ha bocciate, sono state dichiarate MIRATA, e la nota e'
+            # rimasta quella di prima.
+            v = dict(v)
+            v["_causa"] = causa
+            disallineate.append(v)
+            continue
         v = dict(v)
         v["_rimandi"] = _rimandi_della_nota(nota, byid)
         fuori.append(v)
-    return fuori, ""
+    return fuori, "", disallineate
 
 
 def _rimandi_della_nota(nota, byid):
@@ -432,12 +445,27 @@ def main(argv=None):
     a = ap.parse_args(argv)
 
     if a.rassegna:
-        sospette, err = rassegna(a.cartella)
+        sospette, err, disallineate = rassegna(a.cartella)
         if err:
             print(f"ERRORE: {err}", file=sys.stderr)
             return 2
+        def _stampa_disallineate():
+            if not disallineate:
+                return
+            print()
+            print(f"{len(disallineate)} letture con causa dichiarata ma MOTIVAZIONE non riallineata:")
+            for v in disallineate:
+                print(f"  #{v.get('id')} [{v['_causa']}] {v.get('percorso')}")
+                print(f"      motivo ancora: {(v.get('nota') or '').strip()[:110]}")
+            print()
+            print("  La causa dichiarata smentisce la motivazione scritta. Non sono")
+            print("  affermazioni lasciate senza controllo - qualcuno le ha guardate - ma")
+            print("  chi legge la scheda vede solo la motivazione. Vanno riscritte con")
+            print("  'copertura.py parziale', che aggiorna anche sintesi e motivo.")
+
         if not sospette:
             print("OK - nessuna lettura parziale afferma una riproduzione non provata.")
+            _stampa_disallineate()
             return 0
         print(f"{len(sospette)} letture parziali AFFERMANO una riproduzione mai verificata:")
         print()
@@ -470,6 +498,7 @@ def main(argv=None):
         print()
         print("  Movente: Caltagirone, D.D.G. 3/2024. Una di queste teneva fuori ventuno")
         print("  pagine con dentro due pareri CTS unici nel fascicolo.")
+        _stampa_disallineate()
         return 1
 
     mancanti = [n for n, v in (("--atto", a.atto), ("--pagine", a.pagine),
