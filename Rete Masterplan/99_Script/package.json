@@ -2,6 +2,10 @@
   "name": "relazione-gare-sia",
   "private": true,
   "description": "Genera la relazione DOCX sui requisiti di partecipazione delle reti di societa di ingegneria alle gare pubbliche italiane",
-  "scripts": { "build": "node build.js Relazione_Requisiti_Gare_SIA_Rete_Masterplan.docx" },
-  "dependencies": { "docx": "^9.0.0" }
+  "scripts": {
+    "build": "node build.js Relazione_Requisiti_Gare_SIA_Rete_Masterplan.docx"
+  },
+  "dependencies": {
+    "docx": "^9.7.1"
+  }
 }

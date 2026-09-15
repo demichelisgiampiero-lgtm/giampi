@@ -191,7 +191,8 @@ body.push(TBL([
   TROW(['Predisposta da', 'Ing. Giampiero De Michelis — Manager di Rete'], covW, { boldFirst: true, zebra: true, size: 19 }),
   TROW(['Destinatari', 'Imprese Aderenti Fondatrici della Rete Masterplan (9 soggetti) — Organo Comune'], covW, { boldFirst: true, size: 19 }),
   TROW(['Perimetro', 'Servizi di architettura e ingegneria (SIA) ex art. 66 D.Lgs. 36/2023. Esclusa l’esecuzione di lavori e la qualificazione SOA, salvo dove indicato.'], covW, { boldFirst: true, zebra: true, size: 19 }),
-  TROW(['Base documentale interna', '«Bozza contratto di rete R03.docx» (Drive, agg. 14/09/2026), letta integralmente; «Rapporto verifica requisiti partecipazione — Rete mista — Lotti 4-6» (06/08/2026); nota interna sul contratto R03 (14/09/2026).'], covW, { boldFirst: true, size: 19 }),
+  TROW(['Base documentale interna', 'Testo del contratto istitutivo sottoscritto (PDF di 23 pagine, versione R03), letto integralmente e confrontato riga per riga con la bozza agli atti su Drive; «Rapporto verifica requisiti partecipazione — Rete mista — Lotti 4-6» (06/08/2026); nota interna sul contratto R03 (14/09/2026).'], covW, { boldFirst: true, size: 19 }),
+  TROW(['Stato della Rete', 'Rete-soggetto costituita, iscritta al Registro delle Imprese e dotata di partita IVA propria (dato riferito dal Manager di Rete; visura non ancora acquisita agli atti).'], covW, { boldFirst: true, zebra: true, size: 19 }),
   TROW(['Natura del documento', 'Documento interno di lavoro. Non è un parere legale e non sostituisce la valutazione del legale e del notaio incaricati.'], covW, { boldFirst: true, zebra: true, size: 19 })
 ], covW));
 
@@ -214,50 +215,55 @@ body.push(new Paragraph({ children: [new PageBreak()] }));
 body.push(H1('Sintesi per la riunione'));
 body.push(P('Cinque messaggi. Se il tempo in riunione è poco, sono questi i punti su cui serve una decisione collegiale.'));
 
-body.push(H3('1. La rete può concorrere alle gare di ingegneria, ma non è lo strumento che molti di noi hanno in mente'));
+body.push(H3('1. La Rete esiste come operatore economico, ed è la notizia buona di questa relazione'));
 body.push(RP([
-  { t: 'L’art. 65, comma 2, lettera g) del D.Lgs. 36/2023 ammette espressamente fra gli operatori economici le ' },
-  { t: '«aggregazioni tra imprese aderenti al contratto di rete»', i: true },
-  { t: ', e l’art. 68, comma 20 vi estende, in quanto compatibili, le regole dei raggruppamenti temporanei e dei consorzi ordinari. Ma l’art. 66 — la norma ' },
-  { t: 'speciale', i: true },
-  { t: ' che elenca chi può concorrere ai servizi di architettura e ingegneria — non nomina le reti in nessuna delle sue sette lettere. È una tensione normativa irrisolta, che si traduce in un rischio di esclusione per difetto di legittimazione soggettiva: un vizio che il soccorso istruttorio non sana.' }
+  { t: 'Il contratto è stato sottoscritto, la Rete è iscritta al Registro delle Imprese e dispone di partita IVA propria: è a tutti gli effetti una ' },
+  { t: 'rete-soggetto', b: true },
+  { t: ', dotata di soggettività giuridica ai sensi dell’art. 3, comma 4-quater, del D.L. 5/2009. Può quindi contrattare e fatturare in nome proprio, il che per un accordo quadro pluriennale non è un dettaglio contabile ma la condizione per reggere la commessa. Il blocco più grave che pesava sulla versione precedente di questa relazione è superato.' }
 ]));
 
-body.push(H3('2. Il Consiglio di Stato ha chiuso nel 2025 la porta al cumulo dei requisiti'));
+body.push(H3('2. Ma per i servizi di ingegneria la Rete non è ancora qualificata, e le manca un requisito preciso'));
+body.push(RP([
+  { t: 'L’art. 66 del Codice — la norma ' },
+  { t: 'speciale', i: true },
+  { t: ' che elenca chi può concorrere ai servizi di architettura e ingegneria — non nomina le reti in nessuna delle sue sette lettere. Avendo soggettività giuridica autonoma, l’ente-rete non è né una società di ingegneria né una società tra professionisti: l’unica casella disponibile è la ' },
+  { t: 'lettera e), «altri soggetti abilitati in forza del diritto nazionale»', b: true },
+  { t: '. Quella casella richiama l’art. 37 dell’Allegato II.12, che pretende oggetto sociale comprensivo dei SIA, organigramma dei tecnici e ' },
+  { t: 'almeno un direttore tecnico', b: true },
+  { t: ' laureato, abilitato da almeno dieci anni e iscritto all’albo. Nelle ventitré pagine del contratto sottoscritto la figura del direttore tecnico non compare mai. ' },
+  { t: 'È il primo blocco da rimuovere, e ha preso il posto di quello vecchio.', b: true }
+]));
+
+body.push(H3('3. Il Consiglio di Stato ha chiuso nel 2025 la porta al cumulo dei requisiti'));
 body.push(RP([
   { t: 'Con la sentenza della Sezione V n. 8289 del 27 ottobre 2025 è stato affermato che il ' },
   { t: 'cumulo alla rinfusa', b: true },
   { t: ' è istituto eccezionale, riservato ai soli consorzi stabili, e non si estende alle reti di imprese, le quali — prive di soggettività economica unitaria — ' },
   { t: 'devono possedere i requisiti individualmente', b: true },
-  { t: '. La conseguenza pratica è netta: Masterplan somma i requisiti come un raggruppamento temporaneo, non come un consorzio stabile. Chi contava sulla rete per «fare massa critica» sui requisiti deve rivedere l’aspettativa.' }
+  { t: '. La conseguenza pratica è netta: Masterplan somma i requisiti come un raggruppamento temporaneo, non come un consorzio stabile. Chi contava sulla rete per «fare massa critica» sui requisiti deve rivedere l’aspettativa. La soggettività giuridica non cambia questo: il Consiglio di Stato l’ha affermato proprio con riferimento a reti dotate di autonoma personalità.' }
 ]));
 
-body.push(H3('3. Il contratto è ancora una bozza, e finché resta tale la Rete non esiste come operatore economico'));
+body.push(H3('4. Il testo sottoscritto è la bozza R03 senza correzioni, e tre difetti sono entrati nel contratto'));
 body.push(RP([
-  { t: 'Il file agli atti è intitolato «Bozza»; mancano data di sottoscrizione, autentiche ed estremi di iscrizione. L’art. 42 prevede che il contratto ' },
-  { t: '«sarà iscritto»', i: true },
-  { t: ' nella Sezione Ordinaria del Registro delle Imprese di Benevento. La soggettività giuridica si acquista solo con quell’iscrizione, e presuppone atto pubblico, scrittura privata autenticata o atto firmato digitalmente ai sensi dell’art. 25 del CAD. ' },
-  { t: 'Nessuna gara è aggredibile in forma di rete prima di quel passaggio.', b: true }
+  { t: 'Il confronto riga per riga fra il testo sottoscritto e la bozza agli atti non mostra alcuna modifica. Restano quindi nel contratto ' },
+  { t: 'eseguito', i: true },
+  { t: ' tre difetti che incidono sulla partecipazione alle gare: il Presidente e il primo Vice Presidente non figurano fra i nove componenti dell’Organo Comune benché l’art. 17 li voglia nominati «al suo interno»; non è previsto alcun direttore tecnico; il fondo patrimoniale comune è fissato in € 1.000 complessivi con quota individuale indicata anch’essa in € 1.000 a testa. ' },
+  { t: 'Non sono più correzioni da fare prima della firma: sono modifiche a un contratto in vigore', b: true },
+  { t: ', che richiedono la delibera assembleare con le maggioranze dell’art. 15 e la nuova iscrizione al Registro delle Imprese nella forma prescritta dall’art. 37.' }
 ]));
 
-body.push(H3('4. Il mercato si sta concentrando sugli accordi quadro, ed è il formato che premia una struttura come la nostra'));
+body.push(H3('5. Il mercato premia una struttura come la nostra, ma non con i tempi delle finestre aperte'));
 body.push(RP([
-  { t: 'Nei primi cinque mesi del 2026 il mercato delle gare di ingegneria e architettura è cresciuto del 63,4%. Ad aprile gli accordi quadro erano il 25,2% delle gare bandite ma il ' },
+  { t: 'Nei primi cinque mesi del 2026 il mercato delle gare di ingegneria e architettura è cresciuto del 63,4%, e ad aprile gli accordi quadro erano il 25,2% delle gare bandite ma il ' },
   { t: '66% del valore complessivo', b: true },
-  { t: '. Sono però gare grandi, con requisiti dimensionali e multidisciplinari che nessuno di noi copre da solo: è esattamente lo spazio per cui una struttura aggregata ha senso. La domanda non è ' },
-  { t: 'se', i: true },
-  { t: ' aggregarsi, ma ' },
-  { t: 'con quale forma giuridica', i: true },
-  { t: '.' }
+  { t: '. È il formato che valorizza la multidisciplinarità e il presidio continuativo, cioè esattamente ciò per cui la Rete è stata costituita. Le tre procedure oggi aperte — Regione Campania–Sarno (25 settembre), Agenzia del Demanio (2 ottobre), Consip verifica della progettazione (6 ottobre) — non sono però compatibili con i tempi di un’assemblea di modifica e della successiva iscrizione. Su quelle, se si vuole esserci, la forma praticabile resta il raggruppamento temporaneo fra i retisti abilitati.' }
 ]));
-
-body.push(H3('5. Ci sono tre finestre aperte adesso, e su nessuna possiamo presentarci come rete'));
-body.push(P('Regione Campania — Fiume Sarno (scadenza 25 settembre 2026), Agenzia del Demanio (2 ottobre 2026), Consip verifica della progettazione (6 ottobre 2026). Se vogliamo esserci su una di queste, la forma percorribile nei tempi è il raggruppamento temporaneo di professionisti fra gli stessi soggetti che compongono la rete. Il contratto di rete non va abbandonato: resta il presupposto organizzativo e commerciale dell’aggregazione, ma non è, oggi, il veicolo di gara.'));
 
 body.push(SPACER(160));
-body.push(BOX('La decisione da assumere in riunione', [
-  'Se la Rete debba puntare a diventare il veicolo di gara (con le modifiche statutarie e i tempi che questo comporta), oppure restare la cornice commerciale e organizzativa entro cui si costituiscono, di volta in volta, raggruppamenti temporanei fra i retisti.',
-  'Le due strade non si escludono, ma la prima richiede scelte che vanno prese adesso: chi è l’operatore economico che riveste la funzione di organo comune, con quale capienza di fatturato, e con quali correzioni al testo prima della firma.'
+body.push(BOX('La direzione scelta: attrezzare la Rete', [
+  'L’indirizzo è rendere la Rete un operatore qualificato che concorre in proprio, non limitarla al ruolo di cornice commerciale. Questo significa portare in assemblea un pacchetto unico di modifiche e, subito dopo, costruire il fascicolo di qualificazione dell’ente-rete.',
+  'Tre cose vanno deliberate perché la Rete superi il test dell’art. 37 dell’Allegato II.12: la nomina di un direttore tecnico con i requisiti di legge, l’allineamento dell’oggetto e del codice ATECO iscritti ai servizi di architettura e ingegneria, e l’elezione del Presidente fra i componenti dell’Organo Comune. Alle stesse condizioni conviene rideterminare il fondo patrimoniale comune.',
+  'La Parte V indica la sequenza, le maggioranze necessarie e i documenti da raccogliere.'
 ], 'FBF6EC'));
 
 body.push(new Paragraph({ children: [new PageBreak()] }));
@@ -342,7 +348,56 @@ body.push(BOX('Le due letture possibili, e perché la questione resta aperta', [
   'Regola operativa: su ogni gara in cui si valuti la partecipazione come rete, presentare istanza di chiarimento alla stazione appaltante nei termini del disciplinare e non presentare offerta senza risposta scritta favorevole, tenendo pronto il ripiego sul raggruppamento temporaneo.'
 ]));
 
-body.push(H2('1.4  Il Bando tipo ANAC n. 2/2026: la nuova cornice vincolante'));
+body.push(H2('1.4  Che cosa serve alla Rete-soggetto per qualificarsi: il test dell’art. 37'));
+body.push(RP([
+  { t: 'Questo paragrafo è il cuore della relazione, perché descrive ciò che separa Masterplan dalla possibilità di concorrere in proprio. Avendo acquistato soggettività giuridica, ' },
+  { t: 'l’ente-rete è un soggetto di diritto distinto dalle nove imprese che lo compongono', b: true },
+  { t: ': non è una società di ingegneria, non è una società tra professionisti, non è un consorzio stabile. Per concorrere ai servizi di architettura e ingegneria deve quindi trovare posto nell’elenco dell’art. 66, e l’unica collocazione praticabile è la lettera e), «altri soggetti abilitati in forza del diritto nazionale a offrire sul mercato servizi di ingegneria e architettura».' }
+]));
+body.push(RP([
+  { t: 'Quella collocazione ha un prezzo: la lettera e) richiama l’' },
+  { t: 'art. 37 dell’Allegato II.12, Parte V', b: true },
+  { t: ', che pone tre requisiti in capo al soggetto, non all’aggregazione. Sono requisiti verificabili documentalmente, e una commissione li verifica.' }
+]));
+
+const t37W = [2300, 4100, 3238];
+body.push(TBL([
+  THEAD(['Requisito', 'Che cosa chiede la norma', 'Stato della Rete Masterplan'], t37W),
+  TROW([
+    'Oggetto sociale',
+    'L’oggetto deve comprendere i servizi di architettura e ingegneria. I disciplinari aggiungono l’iscrizione al Registro delle Imprese «per attività coerenti con quelle oggetto della procedura», riferita anche all’ente-rete in quanto dotato di soggettività giuridica',
+    'Da verificare sulla visura. L’art. 5 del contratto descrive un oggetto molto ampio, che affianca ai SIA lavori edili, General Contractor, gestione rifiuti, commercio, logistica e formazione: un oggetto disomogeneo è argomento per chi voglia contestare la coerenza'
+  ], t37W, { boldFirst: true }),
+  TROW([
+    'Organigramma',
+    'Organigramma dei soggetti direttamente impiegati nello svolgimento di funzioni professionali e tecniche e di controllo della qualità: soci, amministratori, dipendenti e consulenti su base annua muniti di partita IVA',
+    'Non previsto dal contratto. Va costruito e deliberato: è il documento che dimostra che la Rete dispone di una struttura tecnica e non è un contenitore vuoto'
+  ], t37W, { boldFirst: true, zebra: true }),
+  TROW([
+    'Direttore tecnico',
+    'Almeno un direttore tecnico laureato in ingegneria, architettura o disciplina tecnica attinente all’attività prevalente, abilitato all’esercizio della professione da almeno dieci anni e iscritto al relativo albo, in regola con contribuzione, assicurazione e aggiornamento professionale',
+    'ASSENTE. Nelle ventitré pagine del contratto sottoscritto la figura non compare mai. È il requisito mancante che oggi impedisce alla Rete di concorrere in proprio ai SIA'
+  ], t37W, { boldFirst: true })
+], t37W));
+
+body.push(SPACER(140));
+body.push(P('A questi si aggiungono tre adempimenti che discendono dalla soggettività giuridica e che vanno curati fin dalla prima gara.'));
+body.push(BULR([
+  { t: 'Requisiti generali. ', b: true },
+  { t: 'Gli artt. 94, 95 e 100 del Codice vanno posseduti da ciascun retista che partecipa ' },
+  { t: 'e', i: true },
+  { t: ' dall’ente-rete: significa DGUE proprio della Rete, verifica del casellario, regolarità contributiva e consenso al trattamento dei dati tramite FVOE ex art. 35, comma 5-bis.' }
+]));
+body.push(BULR([
+  { t: 'Sottoscrizione dell’offerta. ', b: true },
+  { t: 'Nella rete-soggetto la domanda di partecipazione è sottoscritta dal solo operatore economico che riveste la funzione di organo comune, il quale assume il ruolo di mandatario e deve obbligatoriamente essere fra i retisti indicati per la gara. La legittimazione di chi firma va quindi documentata in modo inattaccabile.' }
+]));
+body.push(BULR([
+  { t: 'Fatturazione in nome proprio. ', b: true },
+  { t: 'La partita IVA autonoma consente alla Rete di fatturare direttamente le prestazioni, con i rapporti interni regolati da accordi collegati al contratto di rete. È il profilo che rende sostenibile un accordo quadro pluriennale, ma va impostato prima, non a commessa avviata.' }
+]));
+
+body.push(H2('1.5  Il Bando tipo ANAC n. 2/2026: la nuova cornice vincolante'));
 body.push(RP([
   { t: 'Con delibera n. 153 del 15 aprile 2026 l’ANAC ha approvato il ' },
   { t: 'Bando tipo n. 2/2026', b: true },
@@ -364,7 +419,7 @@ body.push(NUMP([
   { t: 'Il 65% dell’importo determinato per i corrispettivi professionali è prezzo fisso; solo il restante 35% è soggetto a confronto concorrenziale. Il margine di manovra sul prezzo è quindi limitato: la competizione si sposta sui contenuti tecnici, che è precisamente il terreno su cui una struttura multidisciplinare può giocare.' }
 ]));
 
-body.push(H2('1.5  I requisiti per tipologia soggettiva: Allegato II.12, Parte V'));
+body.push(H2('1.6  I requisiti per tipologia soggettiva: Allegato II.12, Parte V'));
 body.push(P('Qualunque sia la forma di partecipazione, ciascun componente dell’aggregazione deve possedere i requisiti previsti per la propria natura giuridica dagli artt. 34-40 dell’Allegato II.12, Parte V, al Codice — disposizioni che hanno assorbito il contenuto del previgente D.M. 2 dicembre 2016, n. 263.'));
 
 const allW = [1100, 3100, 5438];
@@ -547,35 +602,105 @@ body.push(new Paragraph({ children: [new PageBreak()] }));
 // === PARTE IV ===
 body.push(H1('Parte IV — Gap analysis della Rete Masterplan'));
 
-body.push(H2('4.1  Stato dell’atto e composizione'));
-body.push(P('Il contratto istitutivo, nella versione R03 agli atti, configura Masterplan come rete dotata di soggettività giuridica ai sensi dell’art. 3, commi 4-ter e 4-quater, del D.L. 5/2009, con fondo patrimoniale comune (art. 10), organo comune di nove membri (art. 16) e sede in Benevento (art. 4). La durata è fissata al 31 dicembre 2050 (art. 29). L’art. 7, lettera g) indica la partecipazione a gare d’appalto pubbliche e private come «obiettivo principale della rete»; l’art. 19 attribuisce all’organo comune la firma digitale delle offerte e la sottoscrizione dei contratti di appalto.'));
+body.push(H2('4.1  Stato dell’atto e riscontri'));
 body.push(RP([
-  { t: 'Sul piano dei requisiti di gara, due elementi sono ' },
+  { t: 'La Rete è costituita, iscritta al Registro delle Imprese e dotata di partita IVA propria. È quindi una ' },
+  { t: 'rete-soggetto', b: true },
+  { t: ' nel senso pieno dell’art. 3, comma 4-quater, del D.L. 5/2009: un soggetto di diritto autonomo, che può contrattare e fatturare in nome proprio. Il contratto configura un organo comune di nove membri (art. 16), un fondo patrimoniale comune (art. 10), sede in Benevento (art. 4) e durata fino al 31 dicembre 2050 (art. 29).' }
+]));
+body.push(RP([
+  { t: 'Il confronto riga per riga fra il testo sottoscritto e la bozza precedentemente agli atti ' },
+  { t: 'non mostra alcuna modifica', b: true },
+  { t: ': il testo firmato coincide integralmente con la versione R03. Questo ha una conseguenza che va compresa bene in riunione. I rilievi che seguono non sono più correzioni da apportare prima della firma — sono ' },
+  { t: 'modifiche a un contratto in vigore', b: true },
+  { t: ', che richiedono la delibera dell’assemblea con le maggioranze dell’art. 15 e la successiva iscrizione nella forma prescritta dall’art. 37. Il costo di intervenire è quindi più alto di quanto sarebbe stato tre mesi fa, ma resta ampiamente sostenibile.' }
+]));
+body.push(RP([
+  { t: 'Due elementi sono ' },
   { t: 'già conformi', b: true },
-  { t: ' alle prescrizioni ricorrenti nei disciplinari: la partecipazione congiunta alle gare risulta individuata come scopo strategico nel programma comune, e la durata della rete (2050) è ampiamente commisurata ai tempi di realizzazione di qualunque accordo quadro. Sono le due carenze più frequenti nelle reti che si presentano in gara, e noi non le abbiamo. Tutto il resto richiede intervento.' }
+  { t: ' alle prescrizioni ricorrenti nei disciplinari, e non è scontato: la partecipazione congiunta alle gare risulta individuata come scopo strategico (art. 5) e come «obiettivo principale della rete» nel programma comune (art. 7, lett. g); la durata al 2050 è ampiamente commisurata ai tempi di qualunque accordo quadro, contratti attuativi compresi. Sono le due carenze più frequenti nelle reti che si presentano in gara, e la Rete non le ha.' }
 ]));
 
+body.push(SPACER(120));
+body.push(BOX('Nota documentale — che cosa si produce alla stazione appaltante', [
+  'Il file esaminato per questa relazione è un documento di videoscrittura esportato in PDF: non contiene blocco firme, estremi notarili, numeri di repertorio e raccolta né riferimenti di iscrizione, e l’art. 42 è ancora formulato al futuro («sarà iscritto… acquisterà soggettività giuridica»). È con ogni evidenza il testo portato alla sottoscrizione, non la copia autenticata.',
+  'In gara i disciplinari chiedono copia del contratto di rete con indicazione dell’organo comune che agisce in rappresentanza, e l’iscrizione camerale dell’ente-rete. Vanno quindi recuperati e tenuti nel fascicolo permanente: la copia con evidenza della sottoscrizione (scansione dell’originale o file firmato digitalmente) e la visura camerale aggiornata della Rete.',
+  'La visura serve anche a chiudere due verifiche di questa relazione che allo stato restano aperte: la coerenza dell’oggetto e del codice ATECO con i servizi di architettura e ingegneria, e l’identità del soggetto che risulta iscritto come organo comune.'
+]));
+
+body.push(H2('4.2  Come si modifica il contratto adesso'));
+body.push(P('Trattandosi di contratto in vigore, ogni intervento segue due regole. L’art. 37 impone che le modifiche siano fatte «nella forma necessaria ai fini dell’iscrizione presso il Registro delle Imprese». L’art. 15 gradua le maggioranze: regola generale la maggioranza delle imprese aderenti; due terzi per le materie riservate all’assemblea dall’art. 14, lettere da a) a g); due terzi più la maggioranza delle Imprese Fondatrici per le lettere h) e i) e per la modifica degli obiettivi strategici e del programma di rete.'));
+
+const delW = [1900, 3500, 2500, 1738];
+body.push(TBL([
+  THEAD(['Articolo', 'Modifica necessaria', 'Perché', 'Maggioranza'], delW),
+  TROW([
+    'Nuovo articolo (o integrazione dell’art. 16)',
+    'Istituzione e nomina del Direttore Tecnico della Rete, con i requisiti dell’art. 37 dell’Allegato II.12: laurea, abilitazione da almeno dieci anni, iscrizione all’albo, regolarità contributiva, assicurativa e di aggiornamento',
+    'È il requisito che oggi impedisce alla Rete di concorrere in proprio ai SIA',
+    'Due terzi (materia riconducibile all’art. 14, lett. a-b)'
+  ], delW, { boldFirst: true }),
+  TROW([
+    'Art. 16 e art. 17',
+    'Elezione del Presidente e dei Vice Presidenti fra i componenti dell’Organo Comune, come l’art. 17 già prescrive, con verbale che documenti la legittimazione del sottoscrittore delle offerte',
+    'Sana il difetto di legittimazione di chi firma digitalmente l’offerta',
+    'Due terzi (art. 14, lett. a-b)'
+  ], delW, { boldFirst: true, zebra: true }),
+  TROW([
+    'Art. 16 e art. 19',
+    'Individuazione dell’impresa retista che riveste la funzione di organo comune ai fini della partecipazione alle gare, e che assume il ruolo di mandataria',
+    'I disciplinari richiedono un operatore economico, non un collegio di persone fisiche',
+    'Due terzi (art. 14, lett. a-b)'
+  ], delW, { boldFirst: true }),
+  TROW([
+    'Art. 5 e visura',
+    'Allineamento dell’oggetto e del codice ATECO iscritti ai servizi di architettura e ingegneria, con approvazione dell’organigramma dei tecnici',
+    'Richiesto dall’art. 37 dell’Allegato II.12 e dalla clausola sull’iscrizione «per attività coerenti»',
+    'Due terzi più maggioranza delle Fondatrici, se incide sugli obiettivi strategici'
+  ], delW, { boldFirst: true, zebra: true }),
+  TROW([
+    'Art. 10',
+    'Rideterminazione del fondo patrimoniale comune e correzione della quota individuale di adesione',
+    'Il fondo è l’unica garanzia dei terzi ex artt. 2614-2615 c.c. e viene guardato da committenti e garanti',
+    'Due terzi (art. 10, ultimo comma, e art. 14, lett. g)'
+  ], delW, { boldFirst: true }),
+  TROW([
+    'Artt. 19, 37 e denominazioni',
+    'Correzioni redazionali: citazione impropria dell’art. 65, co. 2, lett. g) per la firma delle offerte; rinvio dell’art. 37 all’art. 22 anziché all’art. 23; «Europrogettazione srl» e «Europrogettazione Italia srl» usate alternativamente',
+    'Incoerenze che un controinteressato può usare per contestare il testo',
+    'Maggioranza (materia redazionale)'
+  ], delW, { boldFirst: true, zebra: true })
+], delW));
+
+body.push(SPACER(140));
+body.push(BOX('Avvertenza sulle maggioranze e sul diritto di recesso', [
+  'La qualificazione di ciascuna modifica sotto le lettere dell’art. 14, e quindi la maggioranza applicabile, va confermata dal notaio che redige l’atto: l’art. 14 non contempla espressamente la modifica del contratto fra le materie elencate, e la lettura qui proposta è prudenziale.',
+  'Attenzione a un effetto non ovvio: l’art. 5, ultimo periodo, stabilisce che la modifica degli obiettivi strategici costituisce giusta causa di recesso per l’impresa dissenziente. Se l’allineamento dell’oggetto viene costruito come modifica degli obiettivi strategici, un retista contrario può uscire dalla Rete. Conviene quindi impostare l’intervento come precisazione e integrazione, non come riscrittura dell’oggetto, e verificare prima dell’assemblea che il consenso sia pieno.'
+], 'FBF6EC'));
+
 body.push(SPACER(100));
-body.push(H2('4.2  Registro delle criticità'));
-body.push(P('I rilievi sono ordinati per gravità. «Bloccante» significa che il profilo va risolto prima di impegnare risorse su qualunque offerta in forma di rete; «alta» che va risolto prima della firma del contratto; «media» che incide sull’architettura dell’aggregazione o sul punteggio.'));
+body.push(H2('4.3  Registro delle criticità'));
+body.push(P('I rilievi sono ordinati per gravità. «Bloccante» significa che il profilo va risolto prima di impegnare risorse su un’offerta presentata in forma di rete; «alta» che va risolto prima della prima gara; «media» che incide sull’architettura dell’aggregazione o sul punteggio.'));
 
 const gapW = [620, 1080, 4300, 3638];
 const gapRows = [
-  ['G1', 'BLOCCANTE', 'Il contratto è una bozza: mancano data di sottoscrizione, autentiche ed estremi di iscrizione. Senza iscrizione nella Sezione Ordinaria del Registro delle Imprese di Benevento la Rete non ha soggettività giuridica e non esiste come operatore economico.', 'Perfezionare l’atto nella forma di legge — atto pubblico, scrittura privata autenticata o atto firmato digitalmente ex art. 25 CAD — e procedere all’iscrizione. È il presupposto di tutto il resto.'],
-  ['G2', 'BLOCCANTE', 'L’art. 66 del Codice non menziona le aggregazioni di retisti fra i soggetti ammessi ai SIA. Rischio di esclusione per difetto di legittimazione soggettiva, non sanabile con soccorso istruttorio.', 'Su ogni gara: istanza di chiarimento preventiva alla stazione appaltante; nessuna offerta in forma di rete senza risposta scritta favorevole; piano B in RTP costituendo sempre pronto.'],
-  ['G3', 'BLOCCANTE', 'Il cumulo alla rinfusa è escluso per le reti (Cons. Stato, Sez. V, n. 8289/2025). Ogni retista deve possedere i requisiti individualmente; l’organo comune-mandatario deve possederli in misura superiore a ciascun mandante.', 'Ricognizione immediata del fatturato SIA dei migliori tre esercizi dell’ultimo quinquennio per ciascun retista, e verifica di chi può reggere il ruolo di mandataria. Da questo dipende l’architettura della Rete.'],
-  ['G4', 'ALTA', 'L’Organo Comune è collegiale (nove persone fisiche), ma i disciplinari richiedono che a rivestirne la funzione sia un «operatore economico» che assume il ruolo di mandatario e sottoscrive da solo la domanda. Un collegio di persone fisiche non è un operatore economico.', 'Individuare nel contratto quale impresa retista eserciti la funzione di organo comune ai fini della partecipazione alle gare, coerentemente con G3. È un vizio strutturale, non formale.'],
-  ['G5', 'ALTA', 'Presidente e primo Vice Presidente (Vincenzo Salerno, Ines Vona) non compaiono fra i nove componenti dell’Organo Comune, mentre l’art. 17 vuole il Presidente nominato «al suo interno». Chi firma digitalmente l’offerta rischia un difetto di legittimazione.', 'Allineare artt. 16 e 17 prima della firma: il Presidente deve essere componente dell’Organo Comune e la sua legittimazione deve risultare dal contratto e dai verbali.'],
-  ['G6', 'ALTA', 'Non tutti i retisti sono soggetti ex art. 66. Bear Service (ditta individuale, area energia, qualità, sicurezza, compliance 231) ed Europrogettazione Italia (europrogettazione e finanza agevolata) non rientrano, allo stato, fra i prestatori di SIA.', 'Distinguere nel programma di rete i retisti «abilitati SIA» dagli altri. Nelle gare SIA l’aggregazione va composta con i soli soggetti ex art. 66; gli altri possono contribuire come struttura di supporto, non come componenti dell’aggregazione.'],
-  ['G7', 'ALTA', 'Perla Engineering è società di diritto polacco: va ricondotta alla lett. d) dell’art. 66 (prestatori stabiliti in altri Stati membri). Ammissibile, ma con onere documentale specifico e senza iscrizione camerale italiana.', 'Predisporre in anticipo la documentazione di abilitazione secondo la legge polacca e la traduzione asseverata. Valutare con attenzione l’ipotesi che sia questo soggetto a rivestire il ruolo di mandataria: il carico probatorio sarebbe massimo.'],
-  ['G8', 'ALTA', 'La stessa persona fisica (Iannella Barbato) rappresenta tre dei nove retisti — C.E.A., Europrogettazione Italia e I&B Studio — e il contratto non disciplina come voti chi occupa più seggi. In gara questo espone al rischio di «unico centro decisionale» e al divieto di partecipazione plurima.', 'Disciplinare il voto nell’Organo Comune. Mappare le partecipazioni incrociate prima di decidere su quanti lotti presentare offerta: il divieto colpisce il professionista singolo che sia anche socio, amministratore o dipendente di una società che ha presentato offerta su un lotto diverso.'],
-  ['G9', 'MEDIA', 'Fondo patrimoniale comune fissato in 1.000 € con quota individuale indicata anch’essa in «1,000,00 €»: con nove fondatrici i due numeri non tornano e il separatore è errato. Il fondo è l’unica garanzia dei terzi per le obbligazioni dell’organo comune (artt. 2614-2615 c.c.).', 'Correggere e dimensionare il fondo in modo credibile per committenti e istituti di credito. È un dato che le stazioni appaltanti e i garanti guardano.'],
-  ['G10', 'MEDIA', 'I disciplinari richiedono l’iscrizione al Registro delle Imprese «per attività coerenti con quelle oggetto della procedura» anche in capo all’ente-rete, in quanto dotato di soggettività giuridica. L’oggetto dell’art. 5 mescola SIA, lavori, General Contractor, gestione rifiuti, commercio, logistica e formazione.', 'Verificare che oggetto e codice ATECO della rete-soggetto siano coerenti con i servizi di architettura e ingegneria. Un oggetto troppo ampio e disomogeneo è un’arma in mano a chi voglia contestare la coerenza.'],
-  ['G11', 'MEDIA', 'Ciascuna società di ingegneria retista deve disporre di almeno un direttore tecnico con laurea e abilitazione da almeno dieci anni (art. 36, All. II.12). È requisito del singolo soggetto, non dell’aggregazione.', 'Verifica società per società, con raccolta di certificati di iscrizione all’albo e attestazione dell’anzianità. Da fare una volta e mantenere aggiornata.'],
-  ['G12', 'MEDIA', 'Il Bando tipo ANAC 2/2026 istituzionalizza il BIM come processo codificato. La Rete dichiara competenze BIM ma non risulta agli atti una certificazione formale di BIM Manager.', 'Certificare almeno un BIM Manager e dotarsi di ambiente di condivisione dati e capitolato informativo tipo. Senza questo, i lotti sopra soglia sono preclusi in fatto.'],
-  ['G13', 'MEDIA', 'La riduzione del 30% della garanzia provvisoria per certificazione ISO 9001 spetta solo se tutte le imprese retiste partecipanti la possiedono. In una compagine che include ditte individuali è improbabile.', 'Censire le certificazioni. Valutare se comporre l’aggregazione di gara con i soli retisti certificati, quando la riduzione è economicamente rilevante.'],
-  ['G14', 'MEDIA', 'Obbligo del giovane professionista (art. 39, All. II.12): previsto per i raggruppamenti temporanei, applicabile alle reti «in quanto compatibile».', 'Individuare stabilmente almeno un giovane professionista abilitato da meno di cinque anni. I suoi requisiti non concorrono ai requisiti di partecipazione: il costo è nullo, il rischio di ometterlo è l’esclusione.'],
-  ['G15', 'BASSA', 'Rinvii e denominazioni incoerenti: l’art. 37 rinvia all’art. 22 (marchio) per l’adesione di nuove imprese, disciplinata dall’art. 23; «Europrogettazione srl» ed «Europrogettazione Italia srl» si alternano; la citazione dell’art. 65, co. 2, lett. g) all’art. 19 è impropria, trattandosi di norma sui soggetti e non sulla firma.', 'Correzioni redazionali da apportare prima della firma, insieme al resto.']
+  ['G1', 'BLOCCANTE', 'La Rete non dispone di un direttore tecnico. Il contratto non lo prevede né lo nomina. Senza questa figura l’ente-rete non soddisfa l’art. 37 dell’Allegato II.12 e non può qualificarsi come soggetto ex art. 66, comma 1, lett. e).', 'Deliberare in assemblea l’istituzione e la nomina del Direttore Tecnico, scegliendolo fra i professionisti dei retisti che abbiano abilitazione da almeno dieci anni, e raccogliere certificato di iscrizione all’albo, attestazione dell’anzianità, regolarità contributiva e assicurativa.'],
+  ['G2', 'BLOCCANTE', 'L’art. 66 del Codice non menziona le aggregazioni di retisti fra i soggetti ammessi ai SIA. Il rischio è l’esclusione per difetto di legittimazione soggettiva, non sanabile con soccorso istruttorio.', 'Su ogni gara: istanza di chiarimento preventiva alla stazione appaltante nei termini del disciplinare; nessuna offerta in forma di rete senza risposta scritta favorevole; raggruppamento temporaneo pronto come alternativa. Il superamento di G1 e G6 rafforza in modo decisivo la posizione della Rete su questo punto.'],
+  ['G3', 'BLOCCANTE', 'Il cumulo alla rinfusa è escluso per le reti (Cons. Stato, Sez. V, n. 8289/2025) e la soggettività giuridica non cambia il principio. Ogni retista deve possedere i requisiti individualmente; l’organo comune-mandatario deve possederli in misura superiore a ciascun mandante ed eseguire in misura maggioritaria.', 'Ricognizione del fatturato SIA dei migliori tre esercizi dell’ultimo quinquennio per ciascun retista e verifica di chi può reggere il ruolo di mandataria. Da questo dipende l’architettura dell’aggregazione e la scelta dei lotti aggredibili.'],
+  ['G4', 'ALTA', 'Presidente e primo Vice Presidente non figurano fra i nove componenti dell’Organo Comune, mentre l’art. 17 li vuole nominati «al suo interno» e l’art. 19 attribuisce proprio a loro il potere di rappresentanza. Chi firma digitalmente l’offerta lo fa in forza di una nomina che contraddice il contratto.', 'Rielezione del Presidente e dei Vice Presidenti fra i componenti dell’Organo Comune, con verbale idoneo a essere prodotto in gara a dimostrazione dei poteri del sottoscrittore.'],
+  ['G5', 'ALTA', 'L’Organo Comune è un collegio di nove persone fisiche, ma i disciplinari richiedono che a rivestirne la funzione sia un «operatore economico» che assume il ruolo di mandatario e sottoscrive da solo la domanda. Un collegio di persone fisiche non è un operatore economico.', 'Individuare nel contratto quale impresa retista eserciti la funzione di organo comune ai fini delle gare, coerentemente con l’esito della ricognizione di G3.'],
+  ['G6', 'ALTA', 'Oggetto e codice ATECO iscritti: i disciplinari richiedono l’iscrizione camerale «per attività coerenti» anche in capo all’ente-rete. L’art. 5 descrive un oggetto molto ampio che affianca ai SIA lavori, General Contractor, rifiuti, commercio, logistica e formazione.', 'Acquisire la visura e verificare oggetto e ATECO. Se non coerenti, deliberare l’allineamento con le cautele indicate al § 4.2 sul diritto di recesso.'],
+  ['G7', 'ALTA', 'Organigramma dei soggetti impegnati nelle attività tecnico-professionali: richiesto dall’art. 37 dell’Allegato II.12, non previsto dal contratto.', 'Costruire e approvare l’organigramma della Rete, con soci, amministratori, dipendenti e consulenti su base annua muniti di partita IVA, coerente con il gruppo di lavoro tipo.'],
+  ['G8', 'ALTA', 'Non tutti i retisti sono soggetti ex art. 66. Bear Service (ditta individuale: energia, qualità, sicurezza, compliance 231) ed Europrogettazione Italia (europrogettazione e finanza agevolata) non rientrano, allo stato, fra i prestatori di SIA.', 'Distinguere nel programma di rete i retisti «abilitati SIA» dagli altri. Nelle gare SIA l’aggregazione va composta con i soli soggetti ex art. 66; gli altri contribuiscono come struttura di supporto, non come componenti dell’aggregazione.'],
+  ['G9', 'ALTA', 'Perla Engineering è società di diritto polacco: va ricondotta alla lett. d) dell’art. 66, prestatori stabiliti in altri Stati membri. Ammissibile, ma con onere documentale specifico e senza iscrizione camerale italiana.', 'Predisporre in anticipo la documentazione di abilitazione secondo la legge polacca con traduzione asseverata. Valutare con attenzione l’ipotesi che sia questo soggetto a rivestire il ruolo di mandataria: il carico probatorio sarebbe massimo.'],
+  ['G10', 'MEDIA', 'Fondo patrimoniale comune fissato in «€ 1000,00» con quota individuale indicata anch’essa in «€ 1,000,00»: con nove fondatrici i due numeri non tornano e il separatore è errato. Il fondo è la sola garanzia dei terzi per le obbligazioni dell’organo comune (artt. 2614-2615 c.c.).', 'Correggere e dimensionare il fondo in modo credibile per committenti e istituti di credito, con delibera assembleare e iscrizione della modifica.'],
+  ['G11', 'MEDIA', 'La stessa persona fisica rappresenta tre dei nove retisti — C.E.A., Europrogettazione Italia e I&B Studio — e il contratto non disciplina come voti chi occupa più seggi. In gara questo espone al rischio di «unico centro decisionale» e al divieto di partecipazione plurima.', 'Disciplinare il voto nell’Organo Comune. Mappare le partecipazioni incrociate prima di decidere su quanti lotti presentare offerta: il divieto colpisce il professionista singolo che sia anche socio, amministratore o dipendente di una società che ha presentato offerta su un lotto diverso.'],
+  ['G12', 'MEDIA', 'Ciascuna società di ingegneria retista deve disporre di almeno un proprio direttore tecnico con laurea e abilitazione da almeno dieci anni (art. 36, All. II.12). È requisito del singolo soggetto, distinto dal direttore tecnico della Rete di cui a G1.', 'Verifica società per società, con raccolta di certificati di iscrizione all’albo e attestazione dell’anzianità. Da fare una volta e mantenere aggiornata nel fascicolo permanente.'],
+  ['G13', 'MEDIA', 'Il Bando tipo ANAC 2/2026 istituzionalizza il BIM come processo codificato che permea l’intero capitolato. La Rete dichiara competenze BIM ma non risulta agli atti una certificazione formale di BIM Manager.', 'Certificare almeno un BIM Manager e dotarsi di ambiente di condivisione dati e capitolato informativo tipo. Senza questo i lotti sopra soglia sono preclusi in fatto, non in diritto.'],
+  ['G14', 'MEDIA', 'La riduzione del 30% della garanzia provvisoria per certificazione ISO 9001 spetta solo se tutte le imprese retiste partecipanti la possiedono. In una compagine che include ditte individuali è improbabile.', 'Censire le certificazioni. Valutare se comporre l’aggregazione di gara con i soli retisti certificati quando la riduzione è economicamente rilevante.'],
+  ['G15', 'MEDIA', 'Obbligo del giovane professionista (art. 39, All. II.12): previsto per i raggruppamenti temporanei, applicabile alle reti «in quanto compatibile».', 'Individuare stabilmente almeno un giovane professionista abilitato da meno di cinque anni. I suoi requisiti non concorrono ai requisiti di partecipazione: il costo è nullo, il rischio di ometterlo è l’esclusione.'],
+  ['G16', 'BASSA', 'Difetti redazionali sopravvissuti alla sottoscrizione: l’art. 19 cita l’art. 65, co. 2, lett. g) per la firma delle offerte, che è norma sui soggetti e non sulla firma; l’art. 37 rinvia all’art. 22, che riguarda il marchio, anziché all’art. 23 sull’adesione di nuove imprese; «Europrogettazione srl» ed «Europrogettazione Italia srl» si alternano fra firmatari, art. 9 e art. 16.', 'Correzioni da inserire nello stesso pacchetto di modifiche, per non aprire due volte l’atto.'],
+  ['G17', 'INFO', 'Il testo esaminato è un file di videoscrittura privo di blocco firme, estremi notarili e riferimenti di iscrizione. Non è la copia producibile in gara.', 'Recuperare e archiviare nel fascicolo permanente la copia con evidenza della sottoscrizione e la visura camerale aggiornata della Rete.']
 ];
 body.push(TBL([
   THEAD(['ID', 'Gravità', 'Rilievo', 'Azione'], gapW),
@@ -596,53 +721,68 @@ body.push(TBL([
 body.push(new Paragraph({ children: [new PageBreak()] }));
 
 // === PARTE V ===
-body.push(H1('Parte V — Roadmap'));
-
-body.push(H2('5.1  Azioni immediate — entro 30 giorni'));
-body.push(NUMP([
-  { t: 'Ricognizione del fatturato SIA. ', b: true },
-  { t: 'Ciascun retista comunica il fatturato per servizi di ingegneria e architettura dei migliori tre esercizi dell’ultimo quinquennio, con il documento di comprova (bilancio con nota integrativa, Modello Unico o dichiarazione IVA). È il dato da cui dipende chi può fare la mandataria e a quali gare possiamo realisticamente guardare. Senza questo numero ogni altra discussione è teorica.' }
-]));
-body.push(NUMP([
-  { t: 'Designazione dell’operatore economico che riveste la funzione di organo comune. ', b: true },
-  { t: 'Deve essere il retista con il fatturato SIA più elevato, o quantomeno superiore a quello di ciascun altro, e deve disporre in organico dei professionisti con l’anzianità richiesta per i ruoli di responsabile dell’integrazione e di responsabile dell’accordo quadro, che i disciplinari riservano a soggetto interno alla capofila.' }
-]));
-body.push(NUMP([
-  { t: 'Correzione del testo e perfezionamento dell’atto. ', b: true },
-  { t: 'Portare al notaio la bozza con le correzioni dei punti G4, G5, G9, G10 e G15, distinguendo nel programma di rete i retisti abilitati ai SIA (G6). Fissare la data di sottoscrizione e procedere all’iscrizione al Registro delle Imprese di Benevento.' }
-]));
-body.push(NUMP([
-  { t: 'Raccolta documentale di base. ', b: true },
-  { t: 'Per ciascun retista: visura camerale, iscrizioni agli albi, direttore tecnico con attestazione dell’anzianità decennale, certificazioni ISO in corso di validità, polizze, regolarità contributiva. Per Perla Engineering, documentazione di abilitazione secondo la legge polacca con traduzione asseverata.' }
-]));
-body.push(NUMP([
-  { t: 'Decisione sulle tre finestre aperte. ', b: true },
-  { t: 'Sarno (25 settembre), Demanio (2 ottobre), Consip (6 ottobre). Se si decide di concorrere, la forma percorribile nei tempi è il raggruppamento temporaneo di professionisti fra i retisti abilitati. Va deciso in riunione, perché i tempi non consentono un secondo giro.' }
+body.push(H1('Parte V — Roadmap: attrezzare la Rete'));
+body.push(RP([
+  { t: 'L’indirizzo assunto è rendere la Rete un operatore economico qualificato che concorre in proprio ai servizi di architettura e ingegneria, e non limitarla al ruolo di cornice commerciale entro cui si costituiscono raggruppamenti temporanei. È la strada che risolve il problema alla radice: una volta che l’ente-rete supera il test dell’art. 37, la posizione sull’art. 66 diventa difendibile e la Rete può presentarsi con un unico interlocutore su accordi quadro pluriennali. Richiede però un’assemblea, una nuova iscrizione e la costruzione di un fascicolo di qualificazione. La sequenza che segue è ordinata per dipendenze, non per importanza.' }
 ]));
 
-body.push(H2('5.2  Azioni a 90 giorni'));
-body.push(BUL('Certificazione di almeno un BIM Manager e adozione di un ambiente di condivisione dati e di un capitolato informativo tipo, riutilizzabile da gara a gara.'));
-body.push(BUL('Avvio delle procedure di qualificazione presso i sistemi dei settori speciali, a partire da RFI e Italferr, per i retisti interessati. È un percorso lungo, va iniziato subito e in parallelo.'));
-body.push(BUL('Costruzione della checklist documentale di Busta A per l’aggregazione di retisti e per l’RTP, sulla falsariga del Bando tipo ANAC 2/2026, così da non ricostruirla a ogni gara.'));
-body.push(BUL('Individuazione stabile del giovane professionista e mappatura delle partecipazioni incrociate fra professionisti e società retiste, per prevenire i divieti di partecipazione plurima.'));
-body.push(BUL('Mappatura delle coperture che la Rete non possiede: qualificazioni SOA per le componenti di indagini e rilievi, titoli di laboratorio (autorizzazione ministeriale ex art. 59 D.P.R. 380/2001, accreditamento ACCREDIA ISO/IEC 17025, qualificazione amianto), archeologi iscritti all’Elenco Nazionale. Per ciascuna: copertura interna, avvalimento o subappalto necessario.'));
-body.push(BUL('Istruttoria sulla forma giuridica di lungo periodo: se e a quali condizioni valga la pena evolvere verso un consorzio stabile di società di ingegneria in forma mista, unica figura che godrebbe del cumulo alla rinfusa.'));
+body.push(H2('5.1  Fase 1 — L’assemblea di modifica (entro 30 giorni)'));
+body.push(NUMP([
+  { t: 'Ricognizione preliminare del fatturato SIA. ', b: true },
+  { t: 'Ciascun retista comunica il fatturato per servizi di ingegneria e architettura dei migliori tre esercizi dell’ultimo quinquennio, con il documento di comprova: bilancio con nota integrativa per le società di capitali, Modello Unico o dichiarazione IVA per imprese individuali e società di persone. È il dato da cui dipende chi può rivestire la funzione di organo comune, e va acquisito prima di convocare, non durante.' }
+]));
+body.push(NUMP([
+  { t: 'Individuazione del candidato Direttore Tecnico. ', b: true },
+  { t: 'Va scelto fra i professionisti che abbiano abilitazione da almeno dieci anni e iscrizione all’albo, verificando fin d’ora la disponibilità dei certificati e la regolarità contributiva, assicurativa e di aggiornamento. Attenzione: l’art. 34 esclude che il Manager di Rete sia titolare, amministratore, socio o dipendente di un’impresa aderente, ma quella incompatibilità riguarda il Manager, non il Direttore Tecnico. Le due figure vanno tenute distinte anche nel verbale.' }
+]));
+body.push(NUMP([
+  { t: 'Acquisizione della visura e della copia sottoscritta. ', b: true },
+  { t: 'Servono per verificare oggetto, codice ATECO e soggetto iscritto come organo comune, e per completare l’ordine del giorno con cognizione di causa.' }
+]));
+body.push(NUMP([
+  { t: 'Convocazione e delibera. ', b: true },
+  { t: 'Un unico pacchetto di modifiche, secondo la tabella del § 4.2, portato al notaio nella forma necessaria per l’iscrizione. Aprire l’atto una volta sola: ogni ritorno costa tempo e consenso.' }
+]));
 
-body.push(H2('5.3  Le decisioni da assumere in questa riunione'));
+body.push(H2('5.2  Fase 2 — Il fascicolo di qualificazione della Rete (entro 60 giorni)'));
+body.push(BUL('Organigramma dei soggetti impegnati nelle attività tecnico-professionali e di controllo della qualità, con soci, amministratori, dipendenti e consulenti su base annua muniti di partita IVA.'));
+body.push(BUL('Documentazione del Direttore Tecnico: laurea, certificato di iscrizione all’albo, attestazione dell’anzianità di abilitazione, regolarità contributiva e assicurativa, aggiornamento professionale.'));
+body.push(BUL('Iscrizione della modifica al Registro delle Imprese e nuova visura con oggetto e ATECO allineati ai servizi di architettura e ingegneria.'));
+body.push(BUL('Requisiti generali dell’ente-rete: DGUE proprio, verifica del casellario, DURC, consenso al trattamento dei dati tramite FVOE ex art. 35, comma 5-bis del Codice.'));
+body.push(BUL('Per ciascun retista: visura, iscrizioni agli albi, direttore tecnico con attestazione dell’anzianità decennale, certificazioni ISO in corso di validità, polizze professionali, regolarità contributiva. Per Perla Engineering, documentazione di abilitazione secondo la legge polacca con traduzione asseverata.'));
+body.push(BUL('Verbale di elezione del Presidente e dei Vice Presidenti fra i componenti dell’Organo Comune, in forma producibile in gara a dimostrazione dei poteri del sottoscrittore.'));
+
+body.push(H2('5.3  Fase 3 — La dotazione di gara (entro 90 giorni)'));
+body.push(BUL('Certificazione di almeno un BIM Manager, ambiente di condivisione dati e capitolato informativo tipo, riutilizzabili da gara a gara. Con il Bando tipo ANAC 2/2026 il BIM è condizione di accesso sostanziale, non elemento premiale.'));
+body.push(BUL('Individuazione stabile del giovane professionista e mappatura delle partecipazioni incrociate fra professionisti e società retiste, per prevenire i divieti di partecipazione plurima e il rischio di «unico centro decisionale».'));
+body.push(BUL('Mappatura delle coperture che la Rete non possiede: qualificazioni SOA per le componenti di indagini e rilievi, titoli di laboratorio (autorizzazione ministeriale ex art. 59 D.P.R. 380/2001, accreditamento ACCREDIA ISO/IEC 17025, qualificazione amianto), archeologi iscritti all’Elenco Nazionale dei Professionisti dei Beni Culturali. Per ciascuna: copertura interna, avvalimento ex art. 104 o subappalto necessario.'));
+body.push(BUL('Avvio delle procedure di qualificazione presso i sistemi dei settori speciali, a partire da RFI e Italferr, per i retisti interessati. È un percorso lungo e indipendente: va iniziato subito e in parallelo, perché la qualificazione è del singolo soggetto e non si cumula in capo alla Rete.'));
+body.push(BUL('Costruzione della checklist documentale di Busta A per l’aggregazione di retisti, sulla falsariga del Bando tipo ANAC 2/2026, così da non ricostruirla a ogni gara.'));
+
+body.push(H2('5.4  Le finestre aperte e i tempi'));
+body.push(RP([
+  { t: 'Va detto con chiarezza perché non generi aspettative sbagliate: le tre procedure oggi aperte — Regione Campania–Sarno il 25 settembre, Agenzia del Demanio il 2 ottobre, Consip verifica della progettazione il 6 ottobre — ' },
+  { t: 'non sono compatibili con i tempi della Fase 1', b: true },
+  { t: '. Un’assemblea di modifica, l’atto notarile e l’iscrizione al Registro delle Imprese non si completano in dieci o venti giorni, e presentarsi come rete prima che il fascicolo di qualificazione sia chiuso significherebbe esporsi proprio sui punti G1, G6 e G7.' }
+]));
+body.push(P('Se la Rete vuole essere presente su una di queste procedure, la forma praticabile resta il raggruppamento temporaneo fra i retisti abilitati ai SIA, con la Rete che continua a svolgere la funzione di regia commerciale e organizzativa. La scelta di attrezzare la Rete guarda al ciclo successivo: gli accordi quadro che si apriranno nei prossimi mesi, dove la qualificazione dell’ente-rete diventa il vantaggio competitivo.'));
+
+body.push(H2('5.5  Le decisioni da assumere in questa riunione'));
 const decW = [560, 9078];
 body.push(TBL([
   THEAD(['#', 'Decisione'], decW),
-  TROW(['1', 'Se perfezionare il contratto di rete nella versione R03 corretta, dando mandato al notaio e fissando la data di sottoscrizione.'], decW, { boldFirst: true }),
-  TROW(['2', 'Chi, fra i nove retisti, riveste la funzione di organo comune ai fini della partecipazione alle gare — subordinatamente all’esito della ricognizione sul fatturato SIA.'], decW, { boldFirst: true, zebra: true }),
-  TROW(['3', 'Se concorrere su una delle tre finestre aperte e, in caso affermativo, quale, con quale compagine e con quale forma (raggruppamento temporaneo, allo stato l’unica praticabile nei tempi).'], decW, { boldFirst: true }),
-  TROW(['4', 'Se avviare l’istruttoria sull’evoluzione verso il consorzio stabile, con incarico a un gruppo ristretto di riferire entro novanta giorni.'], decW, { boldFirst: true, zebra: true }),
-  TROW(['5', 'Se dimensionare diversamente il fondo patrimoniale comune, e in quale misura.'], decW, { boldFirst: true })
+  TROW(['1', 'Approvare l’indirizzo: la Rete si attrezza per concorrere in proprio ai servizi di architettura e ingegneria, con il pacchetto di modifiche del § 4.2 da portare in assemblea straordinaria.'], decW, { boldFirst: true }),
+  TROW(['2', 'Designare il candidato Direttore Tecnico della Rete e dare mandato di verificarne i requisiti documentali prima della convocazione.'], decW, { boldFirst: true, zebra: true }),
+  TROW(['3', 'Stabilire quale impresa retista riveste la funzione di organo comune ai fini delle gare, subordinatamente all’esito della ricognizione sul fatturato SIA.'], decW, { boldFirst: true }),
+  TROW(['4', 'Fissare la nuova misura del fondo patrimoniale comune e la quota individuale di adesione.'], decW, { boldFirst: true, zebra: true }),
+  TROW(['5', 'Decidere se concorrere su una delle tre finestre aperte in forma di raggruppamento temporaneo e, in caso affermativo, su quale e con quale compagine.'], decW, { boldFirst: true }),
+  TROW(['6', 'Dare mandato al Manager di Rete di acquisire la copia sottoscritta del contratto e la visura camerale, e di costituire il fascicolo permanente di qualificazione.'], decW, { boldFirst: true, zebra: true })
 ], decW));
 
 body.push(SPACER(220));
 body.push(BOX('Una considerazione finale', [
-  'Il quadro che emerge non è sfavorevole: è semplicemente diverso da quello che ci si aspetta di solito quando si costituisce una rete per andare in gara. La rete non moltiplica i requisiti, e su questo il Consiglio di Stato è stato netto. Ma il mercato si sta spostando su accordi quadro pluriennali e multidisciplinari, dove conta la capacità di presidiare in modo continuativo e di coprire competenze che nessuno ha per intero: progettazione, ambiente, laboratorio, strutture, BIM, beni culturali, sicurezza.',
-  'È esattamente la nostra composizione. Il valore di Masterplan sta lì, e sta nel non dover ricostruire da zero un’aggregazione a ogni bando. La forma con cui ci si presenta in gara è una scelta tecnica da fare volta per volta; la decisione strategica è se vogliamo essere, in modo stabile e credibile, un operatore in grado di reggere quei contenitori.'
+  'Il quadro è migliore di quello che si presentava prima di conoscere lo stato della Rete. Il soggetto esiste, ha personalità giuridica e partita IVA, e i due requisiti che le reti più spesso non hanno — la partecipazione congiunta alle gare fra gli scopi strategici e una durata capiente — ci sono già. Quello che manca è un fascicolo di qualificazione, non un assetto da rifondare.',
+  'Il punto da non perdere di vista è che la rete non moltiplica i requisiti: su questo il Consiglio di Stato è stato netto nel 2025. Il valore di Masterplan sta altrove, e sta esattamente dove il mercato si sta spostando: accordi quadro pluriennali e multidisciplinari, dove conta presidiare in modo continuativo e coprire competenze che nessuno ha per intero — progettazione, ambiente, laboratorio, strutture, BIM, beni culturali, sicurezza. È la nostra composizione. La decisione presa è di attrezzarci perché quel valore sia anche formalmente spendibile.'
 ]));
 
 // ---------- document ----------
